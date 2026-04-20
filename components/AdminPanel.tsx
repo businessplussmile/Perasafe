@@ -50,7 +50,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ documents, onAddDocument, onImp
   const [activeFont, setActiveFont] = useState(FONTS[0].value);
   const [showInstructions, setShowInstructions] = useState(true);
   const [isSummarizing, setIsSummarizing] = useState(false);
-  const [aiSummary, setAiSummary] = useState('');
+  const [docSummary, setDocSummary] = useState('');
   const [validityDuration, setValidityDuration] = useState(86400000); // Default: 24h in ms
   
   const [editingDoc, setEditingDoc] = useState<SecureDocument | null>(null);
@@ -159,24 +159,24 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ documents, onAddDocument, onImp
       return;
     }
     const partnerIds = partnerEmails.split(',').map(email => email.trim()).filter(email => email !== '');
-    onAddDocument({ title, content, mimeType: 'text/html', accessCode: code, partnerIds, summary: aiSummary, validityDuration });
+    onAddDocument({ title, content, mimeType: 'text/html', accessCode: code, partnerIds, summary: docSummary, validityDuration });
     showToast("Document ajouté avec succès.");
     resetForm();
   };
 
-  const generateAISummary = async () => {
+  const generateSummary = async () => {
     const content = editorRef.current?.innerText || '';
     if (!content || content.length < 50) {
-      showToast("Contenu trop court pour l'analyse IA.", 'error');
+      showToast("Contenu trop court pour l'analyse.", 'error');
       return;
     }
     setIsSummarizing(true);
     try {
       const summary = await summarizeDocument(content);
-      setAiSummary(summary);
-      showToast("Synthèse IA générée.");
+      setDocSummary(summary);
+      showToast("Synthèse stratégique générée.");
     } catch (error) {
-      showToast("Erreur lors de l'analyse IA.", 'error');
+      showToast("Erreur lors de l'analyse.", 'error');
     } finally {
       setIsSummarizing(false);
     }
@@ -187,7 +187,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ documents, onAddDocument, onImp
     if (editorRef.current) editorRef.current.innerHTML = '';
     setCode('');
     setPartnerEmails('');
-    setAiSummary('');
+    setDocSummary('');
     setStats({ words: 0, time: 0 });
   };
 
@@ -279,12 +279,12 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ documents, onAddDocument, onImp
                   <h2 className="text-xl font-black text-slate-900 uppercase tracking-tighter">Rédaction Stratégique</h2>
                   <button 
                     type="button"
-                    onClick={generateAISummary}
+                    onClick={generateSummary}
                     disabled={isSummarizing}
                     className="flex items-center gap-2 px-4 py-2 bg-indigo-50 text-indigo-600 rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-indigo-100 transition-all disabled:opacity-50"
                   >
                     {isSummarizing ? <Loader2 className="w-3 h-3 animate-spin"/> : <Sparkles className="w-3 h-3" />}
-                    {isSummarizing ? 'Analyse...' : 'Synthèse IA'}
+                    {isSummarizing ? 'Analyse...' : 'Synthèse Stratégique'}
                   </button>
                 </div>
               </div>
@@ -295,12 +295,12 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ documents, onAddDocument, onImp
                 className="w-full bg-transparent border-b-2 border-slate-200 py-2 text-2xl font-black text-slate-900 outline-none focus:border-[#F2AF31] transition-all"
                 placeholder="Titre du document..."
               />
-              {aiSummary && (
+              {docSummary && (
                 <div className="bg-indigo-50/50 p-4 rounded-xl border border-indigo-100 animate-fade-in">
                   <p className="text-[10px] font-bold text-indigo-600 uppercase tracking-widest flex items-center gap-2 mb-1">
-                    <Sparkles className="w-2.5 h-2.5" /> Résumé Stratégique (IA)
+                    <Sparkles className="w-2.5 h-2.5" /> Résumé Stratégique
                   </p>
-                  <p className="text-[11px] text-slate-600 italic">"{aiSummary}"</p>
+                  <p className="text-[11px] text-slate-600 italic">"{docSummary}"</p>
                 </div>
               )}
             </div>

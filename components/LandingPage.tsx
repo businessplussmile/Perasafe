@@ -177,9 +177,9 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStart, onLogin, onViewProto
                 <div className="w-12 h-12 bg-indigo-600 rounded-xl flex items-center justify-center mb-8 shadow-lg shadow-indigo-600/20">
                   <Sparkles className="w-6 h-6 text-white" />
                 </div>
-                <h3 className="text-3xl md:text-4xl font-black tracking-tighter mb-4 leading-none">Intelligence <br />Artificielle Native.</h3>
+                <h3 className="text-3xl md:text-4xl font-black tracking-tighter mb-4 leading-none">Analyse <br />Locale Souveraine.</h3>
                 <p className="text-slate-500 text-base md:text-lg font-medium leading-relaxed max-w-sm">
-                  Générez des synthèses confidentielles de vos documents complexes en un clic grâce à Gemini 3.0.
+                  Générez des synthèses stratégiques de vos documents complexes en un clic grâce à notre moteur d'indexation souverain.
                 </p>
               </div>
               <div className="mt-auto relative z-10">
@@ -296,7 +296,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStart, onLogin, onViewProto
               <ul className="space-y-4 mb-10 flex-1">
                 <li className="text-sm font-bold text-indigo-100 flex items-center justify-center gap-2">50 documents stratégiques</li>
                 <li className="text-sm font-bold text-indigo-100 flex items-center justify-center gap-2">Vaults Multi-clés</li>
-                <li className="text-sm font-bold text-indigo-100 flex items-center justify-center gap-2">Intelligence AI Illimitée</li>
+                <li className="text-sm font-bold text-indigo-100 flex items-center justify-center gap-2">Analyses Stratégiques Illimitées</li>
               </ul>
               <button onClick={onStart} className="w-full bg-white text-indigo-600 font-black py-4 rounded-3xl text-xs uppercase tracking-widest shadow-xl hover:scale-105 transition-all">Choisir Pro</button>
             </div>
