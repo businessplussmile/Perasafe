@@ -2,6 +2,7 @@
 import React from 'react';
 import { motion } from 'motion/react';
 import { ShieldCheck, Zap, Lock, Users, Sparkles, ChevronRight, Play, CheckCircle2, ArrowRight } from 'lucide-react';
+import ParallaxSecuritySpace from './ParallaxSecuritySpace';
 
 interface LandingPageProps {
   onStart: () => void;
@@ -246,22 +247,61 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStart, onLogin, onViewProto
                 Tout savoir sur notre protocole <ArrowRight className="w-5 h-5" />
               </button>
             </div>
-            <div className="flex-1 w-full grid grid-cols-2 gap-4">
-              <div className="bg-slate-100 rounded-2xl aspect-square flex items-center justify-center p-8 hover:bg-indigo-600 hover:text-white transition-all duration-500 group">
-                <Lock className="w-10 h-10 text-slate-400 group-hover:text-white transition-colors" />
-              </div>
-              <div className="bg-slate-100 rounded-2xl aspect-square flex items-center justify-center p-8 mt-6 hover:bg-slate-900 hover:text-white transition-all duration-500 group">
-                <Users className="w-10 h-10 text-slate-400 group-hover:text-white transition-colors" />
-              </div>
-              <div className="bg-slate-100 rounded-2xl aspect-square flex items-center justify-center p-8 -mt-6 hover:bg-orange-500 hover:text-white transition-all duration-500 group">
-                <ShieldCheck className="w-10 h-10 text-slate-400 group-hover:text-white transition-colors" />
-              </div>
-              <div className="bg-slate-100 rounded-2xl aspect-square flex items-center justify-center p-8 hover:bg-indigo-100 transition-all duration-500 group">
-                 <div className="p-3 bg-white rounded-xl shadow-xl">
-                    <Sparkles className="w-6 h-6 text-indigo-600" />
-                 </div>
-              </div>
+            <div className="flex-1 w-full relative">
+              <ParallaxSecuritySpace />
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Testimonials */}
+      <section className="py-24 bg-white">
+        <div className="max-w-7xl mx-auto px-6">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl md:text-5xl font-black tracking-tighter uppercase mb-4">Ils nous font <br />confiance.</h2>
+            <p className="text-slate-500 font-black uppercase tracking-widest text-[10px]">Parole de leaders stratégiques</p>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            {[
+              {
+                name: "Dramane Konaté",
+                role: "Directeur Juridique",
+                text: "La simplicité du chiffrement local nous a permis de sécuriser nos contrats sensibles sans changer nos habitudes. Un outil robuste qui respecte enfin la confidentialité promise.",
+                initials: "DK"
+              },
+              {
+                name: "Amandine Lefebvre",
+                role: "Consultante en Stratégie",
+                text: "Ce que j'apprécie, c'est l'absence totale de stockage cloud traditionnel. Mes analyses stratégiques restent dans mon périmètre exclusif, sans risque de fuite externe.",
+                initials: "AL"
+              },
+              {
+                name: "Jean-Marc Zadi",
+                role: "Fondateur de TechFlow",
+                text: "Le moteur d'indexation interne est d'une efficacité redoutable. Obtenir des synthèses claires sans jamais exposer nos secrets industriels est un avantage concurrentiel majeur.",
+                initials: "JZ"
+              }
+            ].map((t, i) => (
+              <motion.div 
+                key={i}
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                transition={{ delay: i * 0.1 }}
+                className="bg-slate-50 p-8 rounded-[2.5rem] border border-slate-100 shadow-sm hover:shadow-xl transition-all duration-500"
+              >
+                <div className="flex items-center gap-4 mb-6">
+                  <div className="w-12 h-12 rounded-2xl bg-indigo-600 flex items-center justify-center text-white font-black text-sm">
+                    {t.initials}
+                  </div>
+                  <div>
+                    <h4 className="font-black text-slate-900 text-sm uppercase leading-tight">{t.name}</h4>
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{t.role}</span>
+                  </div>
+                </div>
+                <p className="text-slate-600 text-sm leading-relaxed italic">"{t.text}"</p>
+              </motion.div>
+            ))}
           </div>
         </div>
       </section>

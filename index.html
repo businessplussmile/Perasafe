@@ -51,6 +51,15 @@
             overflow-x: hidden;
             scroll-behavior: smooth;
         }
+
+        /* Masquer la barre de défilement pour tous les navigateurs */
+        body::-webkit-scrollbar {
+            display: none;
+        }
+        body {
+            -ms-overflow-style: none;  /* IE and Edge */
+            scrollbar-width: none;  /* Firefox */
+        }
         
         .font-serif { font-family: 'Crimson Pro', serif; }
         .font-mono { font-family: 'JetBrains Mono', monospace; }
