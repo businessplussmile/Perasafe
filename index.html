@@ -1,0 +1,143 @@
+
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PERADoc | Secure Node</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        indigo: {
+                            50: '#faf5f2',
+                            100: '#f5ece6',
+                            200: '#ead7cb',
+                            300: '#d8b9a7',
+                            400: '#c0947b',
+                            500: '#ab775c',
+                            600: '#643012', 
+                            700: '#532810',
+                            800: '#45220e',
+                            900: '#391d0d',
+                        },
+                    }
+                }
+            }
+        }
+    </script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:ital,wght@0,400;0,700;1,400&family=Plus+Jakarta+Sans:wght@300;400;600;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --accent: #643012;
+            --secondary: #F2AF31;
+            --bg-main: #f8fafc;
+        }
+
+        * {
+            -webkit-tap-highlight-color: transparent;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background-color: var(--bg-main);
+            color: #1e293b;
+            user-select: none;
+            overflow-x: hidden;
+            scroll-behavior: smooth;
+        }
+        
+        .font-serif { font-family: 'Crimson Pro', serif; }
+        .font-mono { font-family: 'JetBrains Mono', monospace; }
+
+        body::before {
+            content: "";
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background-image: url("https://grainy-gradients.vercel.app/noise.svg");
+            opacity: 0.015;
+            pointer-events: none;
+            z-index: 9999;
+        }
+
+        @media print { body { display: none !important; } }
+
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: rgba(100, 48, 18, 0.1);
+            border-radius: 10px;
+        }
+
+        .glass-light {
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(25px);
+            border-bottom: 1px solid rgba(100, 48, 18, 0.05);
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes modalIn {
+            from { opacity: 0; transform: scale(0.95) translateY(10px); }
+            to { opacity: 1; transform: scale(1) translateY(0); }
+        }
+
+        .animate-fade-in {
+            animation: fadeIn 0.3s cubic-bezier(0.2, 0, 0, 1) forwards;
+            will-change: opacity, transform;
+        }
+
+        .animate-modal-in {
+            animation: modalIn 0.25s cubic-bezier(0.17, 0.84, 0.44, 1) forwards;
+            will-change: opacity, transform;
+        }
+
+        /* Animations de transition fluides */
+        .view-transition-enter {
+            opacity: 0;
+            transform: scale(0.98) translateY(10px);
+        }
+        .view-transition-enter-active {
+            opacity: 1;
+            transform: scale(1) translateY(0);
+            transition: opacity 300ms cubic-bezier(0.23, 1, 0.32, 1), transform 300ms cubic-bezier(0.23, 1, 0.32, 1);
+        }
+
+        @keyframes scan {
+            0% { transform: translateY(-100%); opacity: 0; }
+            50% { opacity: 0.3; }
+            100% { transform: translateY(100%); opacity: 0; }
+        }
+        .scan-line {
+            height: 2px;
+            background: linear-gradient(to right, transparent, var(--secondary), transparent);
+            animation: scan 4s infinite linear;
+        }
+
+        .btn-active:active { transform: scale(0.97); transition: transform 0.1s ease; }
+    </style>
+<script type="importmap">
+{
+  "imports": {
+    "react": "https://esm.sh/react@^19.2.3",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+    "react/": "https://esm.sh/react@^19.2.3/",
+    "@google/genai": "https://esm.sh/@google/genai@^1.38.0"
+  }
+}
+</script>
+<link rel="stylesheet" href="/index.css">
+</head>
+<body>
+    <div id="root"></div>
+<script type="module" src="/index.tsx"></script>
+</body>
+</html>

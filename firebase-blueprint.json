@@ -1,0 +1,66 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "Represents a user in the system (Company Owner or Partner)",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "Firebase Auth UID" },
+        "email": { "type": "string", "format": "email" },
+        "role": { "type": "string", "enum": ["ADMIN", "COMPANY_OWNER", "PARTNER"] },
+        "companyId": { "type": "string", "description": "Associated company ID for owners" },
+        "name": { "type": "string", "description": "Display name (max 100 chars)" },
+        "createdAt": { "type": "number", "description": "Server timestamp in ms" }
+      },
+      "required": ["uid", "email", "role", "createdAt"]
+    },
+    "Company": {
+      "title": "Company",
+      "description": "An enterprise that can subscribe and share documents",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string", "description": "Company name (max 200 chars)" },
+        "ownerId": { "type": "string", "description": "UID of the company owner" },
+        "subscriptionStatus": { "type": "string", "enum": ["ACTIVE", "INACTIVE", "TRIAL"] },
+        "subscriptionTier": { "type": "string", "enum": ["STANDARD", "PREMIUM"] },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["id", "name", "ownerId", "subscriptionStatus", "createdAt"]
+    },
+    "SecureDocument": {
+      "title": "SecureDocument",
+      "description": "A document encrypted and shared with partners",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string", "description": "Title (max 200 chars)" },
+        "content": { "type": "string", "description": "Encrypted Base64 content" },
+        "mimeType": { "type": "string" },
+        "accessCode": { "type": "string", "description": "Hashed or temporary access code" },
+        "isConsumed": { "type": "boolean" },
+        "createdAt": { "type": "number" },
+        "companyId": { "type": "string" },
+        "uploaderId": { "type": "string" },
+        "partnerIds": { "type": "array", "maxItems": 100, "items": { "type": "string", "format": "email" } },
+        "lifespanStart": { "type": "number" },
+        "lastCodeUsedAtOpening": { "type": "string" }
+      },
+      "required": ["id", "title", "content", "accessCode", "companyId", "createdAt", "uploaderId"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "App users"
+    },
+    "/companies/{companyId}": {
+      "schema": "Company",
+      "description": "Companies information"
+    },
+    "/companies/{companyId}/documents/{docId}": {
+      "schema": "SecureDocument",
+      "description": "Documents shared by the company"
+    }
+  }
+}
