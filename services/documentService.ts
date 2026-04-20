@@ -1,18 +1,13 @@
 
-import { GoogleGenAI } from "@google/genai";
-
 /**
- * PERADoc Strategic Security Processor
- * Chiffrement symétrique de haut niveau pour documents confidentiels.
+ * PERADoc Strategic Security Processor - INTERNAL ENGINE (No External AI)
+ * Chiffrement symétrique et analyse heuristique locale.
  */
 
 const SYSTEM_SALT = "PERAFIND_SECURE_NODE_X14_SALT_2025";
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-
 /**
  * Transforme le contenu en ciphertext illisible.
- * Utilise la clé d'accès comme pivot de chiffrement.
  */
 export const encryptContent = (content: string, key: string): string => {
   if (!content || !key) return content;
@@ -23,17 +18,14 @@ export const encryptContent = (content: string, key: string): string => {
     const keyBytes = new TextEncoder().encode(fullKey);
     const keyLen = keyBytes.length;
     
-    // Phase 1 : XOR Cipher itératif optimisé
     const encrypted = new Uint8Array(contentBytes.length);
     for (let i = 0; i < contentBytes.length; i++) {
       encrypted[i] = contentBytes[i] ^ keyBytes[i % keyLen];
     }
     
-    // Phase 2 : Obfuscation Base64
     const binString = String.fromCodePoint(...encrypted);
     const base64 = btoa(binString);
     
-    // Phase 3 : Signature et inversion
     return `SECUREV1:${base64.split('').reverse().join('')}`;
   } catch (e) {
     console.error("Encryption failure", e);
@@ -63,29 +55,31 @@ export const decryptContent = (ciphertext: string, key: string): string => {
     
     return new TextDecoder().decode(decrypted);
   } catch (e) {
-    console.warn("Decryption error : Clé invalide ou données corrompues.");
+    console.warn("Decryption error : Clé invalide.");
     return "ERREUR DE DÉCHIFFREMENT : Le contenu est protégé ou corrompu.";
   }
 };
 
 /**
- * Analyse intelligente du document avec Gemini
+ * Analyse heuristique interne du document (Remplacement de l'IA par un moteur local)
  */
 export const summarizeDocument = async (content: string): Promise<string> => {
-  try {
-    const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
-      contents: `Analyse et résume ce document confidentiel en 2-3 phrases maximum. Sois précis et professionnel. Contenu : ${content}`,
-      config: {
-        systemInstruction: "Tu es un analyste en cybersécurité et conformité pour PERASafe Cloud. Ton rôle est de fournir des résumés stratégiques sans divulguer les secrets techniques.",
-      }
-    });
+  if (!content || content.length < 10) return "Contenu trop court pour analyse.";
 
-    return response.text || "Synthèse indisponible.";
-  } catch (error) {
-    console.error("Gemini Analysis error:", error);
-    return "Échec de l'analyse IA.";
-  }
+  const text = content.trim();
+  const wordCount = text.split(/\s+/).length;
+  const sentenceCount = text.split(/[.!?]+/).length - 1;
+  
+  // Extraction des points clés par fréquence ou position (Version déterministe)
+  const lines = text.split('\n').filter(l => l.trim().length > 15);
+  const coreContext = lines.length > 0 ? lines[0].substring(0, 100).trim() : text.substring(0, 100).trim();
+
+  let type = "Texte brut";
+  if (text.startsWith("{") || text.startsWith("[")) type = "Structure JSON";
+  if (text.includes("<?xml") || text.includes("<html")) type = "Balises XML/HTML";
+  if (text.includes(";") && lines.some(l => l.includes(";"))) type = "Données Tabulaires (CSV)";
+
+  return `Indexation Interne : ${type} identifié. Volume : ${wordCount} mots répartis en ${sentenceCount} segments. Amorce contextuelle : "${coreContext}..."`;
 };
 
 export const getFileMetadata = (fileName: string, fileSize: number) => {

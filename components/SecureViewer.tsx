@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { SecureDocument } from '../types';
 import { useSecurity } from '../hooks/useSecurity';
-import { decryptContent } from '../services/geminiService';
+import { decryptContent } from '../services/documentService';
 import { Sparkles } from 'lucide-react';
 
 interface SecureViewerProps {

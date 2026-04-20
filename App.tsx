@@ -10,7 +10,7 @@ import GreetingAnimation from './components/GreetingAnimation';
 import SuperAdminPanel from './components/SuperAdminPanel';
 import LandingPage from './components/LandingPage';
 import ProductTour from './components/ProductTour';
-import { encryptContent, decryptContent, summarizeDocument } from './services/geminiService';
+import { encryptContent, decryptContent, summarizeDocument } from './services/documentService';
 import { useAuth } from './hooks/useAuth';
 import { db, signOut } from './services/firebaseService';
 import { collection, query, where, onSnapshot, doc, updateDoc, deleteDoc, setDoc, addDoc, serverTimestamp, getDoc, collectionGroup } from 'firebase/firestore';

@@ -1,7 +1,7 @@
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { SecureDocument } from '../types';
-import { summarizeDocument } from '../services/geminiService';
+import { summarizeDocument } from '../services/documentService';
 import { Sparkles, Loader2 } from 'lucide-react';
 
 interface AdminPanelProps {
