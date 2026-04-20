@@ -262,7 +262,13 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStart, onLogin, onViewProto
             <p className="text-slate-500 font-black uppercase tracking-widest text-[10px]">Parole de leaders stratégiques</p>
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: "-100px" }}
+            transition={{ duration: 0.8 }}
+            className="grid grid-cols-1 md:grid-cols-3 gap-8"
+          >
             {[
               {
                 name: "Dramane Konaté",
@@ -283,11 +289,8 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStart, onLogin, onViewProto
                 initials: "JZ"
               }
             ].map((t, i) => (
-              <motion.div 
+              <div 
                 key={i}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.1 }}
                 className="bg-slate-50 p-8 rounded-[2.5rem] border border-slate-100 shadow-sm hover:shadow-xl transition-all duration-500"
               >
                 <div className="flex items-center gap-4 mb-6">
@@ -300,9 +303,9 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStart, onLogin, onViewProto
                   </div>
                 </div>
                 <p className="text-slate-600 text-sm leading-relaxed italic">"{t.text}"</p>
-              </motion.div>
+              </div>
             ))}
-          </div>
+          </motion.div>
         </div>
       </section>
 
@@ -364,6 +367,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStart, onLogin, onViewProto
              <motion.div
                 initial={{ opacity: 0, scale: 0.9 }}
                 whileInView={{ opacity: 1, scale: 1 }}
+                viewport={{ once: true }}
                 transition={{ duration: 1 }}
              >
                 <h2 className="text-4xl md:text-6xl font-black tracking-tighter mb-10 uppercase leading-[0.85]">Prêt pour la <br />guerre des idées ?</h2>
