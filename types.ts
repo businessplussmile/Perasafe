@@ -44,7 +44,7 @@ export interface SecureDocument {
   validityDuration?: number; // In milliseconds
 }
 
-export type ViewMode = 'LANDING' | 'USER' | 'ADMIN' | 'VIEWER' | 'LOGIN' | 'ONBOARDING' | 'SUBSCRIPTION';
+export type ViewMode = 'LANDING' | 'USER' | 'ADMIN' | 'VIEWER' | 'LOGIN' | 'ONBOARDING' | 'SUBSCRIPTION' | 'PROTOCOL' | 'PRIVACY';
 
 export interface AuthorizedMember {
   name: string;

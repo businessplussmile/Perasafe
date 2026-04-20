@@ -10,6 +10,8 @@ import GreetingAnimation from './components/GreetingAnimation';
 import SuperAdminPanel from './components/SuperAdminPanel';
 import LandingPage from './components/LandingPage';
 import ProductTour from './components/ProductTour';
+import ProtocolPage from './components/ProtocolPage';
+import PrivacyPolicy from './components/PrivacyPolicy';
 import { encryptContent, decryptContent, summarizeDocument } from './services/documentService';
 import { useAuth } from './hooks/useAuth';
 import { db, signOut } from './services/firebaseService';
@@ -337,13 +339,26 @@ const App: React.FC = () => {
   }
 
   if (!user || (viewMode === 'ONBOARDING' && !profile)) {
+    if (viewMode === 'PROTOCOL') {
+      return (
+        <ProtocolPage 
+          onBack={() => setViewMode('LANDING')} 
+          onSubscribe={() => setViewMode('LOGIN')} 
+        />
+      );
+    }
+    if (viewMode === 'PRIVACY') {
+      return <PrivacyPolicy onBack={() => setViewMode('LANDING')} />;
+    }
     if (viewMode === 'LOGIN' || viewMode === 'ONBOARDING') {
       return <LoginPortal onBack={() => setViewMode('LANDING')} />;
     }
     return (
       <LandingPage 
         onStart={() => setViewMode('LOGIN')} 
-        onLogin={() => setViewMode('LOGIN')} 
+        onLogin={() => setViewMode('LOGIN')}
+        onViewProtocol={() => setViewMode('PROTOCOL')}
+        onViewPrivacy={() => setViewMode('PRIVACY')}
       />
     );
   }
@@ -394,6 +409,17 @@ const App: React.FC = () => {
           )}
           {viewMode === 'SUBSCRIPTION' && profile?.role === 'ADMIN' && (
             <SuperAdminPanel />
+          )}
+          {viewMode === 'PROTOCOL' && (
+            <ProtocolPage 
+              onBack={() => switchView('USER')} 
+              onSubscribe={() => setIsSubscriptionModalOpen(true)} 
+            />
+          )}
+          {viewMode === 'PRIVACY' && (
+            <PrivacyPolicy 
+              onBack={() => switchView('USER')} 
+            />
           )}
           {viewMode === 'VIEWER' && activeDoc && (
           <SecureViewer 

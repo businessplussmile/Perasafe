@@ -6,9 +6,11 @@ import { ShieldCheck, Zap, Lock, Users, Sparkles, ChevronRight, Play, CheckCircl
 interface LandingPageProps {
   onStart: () => void;
   onLogin: () => void;
+  onViewProtocol: () => void;
+  onViewPrivacy: () => void;
 }
 
-const LandingPage: React.FC<LandingPageProps> = ({ onStart, onLogin }) => {
+const LandingPage: React.FC<LandingPageProps> = ({ onStart, onLogin, onViewProtocol, onViewPrivacy }) => {
   return (
     <div className="min-h-screen bg-white font-sans text-slate-900 overflow-x-hidden">
       {/* Header */}
@@ -238,7 +240,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStart, onLogin }) => {
                 ))}
               </div>
               <button 
-                onClick={onStart}
+                onClick={onViewProtocol}
                 className="inline-flex items-center gap-3 text-indigo-600 font-black uppercase tracking-widest text-sm border-b-2 border-indigo-600 pb-2 hover:gap-6 transition-all"
               >
                 Tout savoir sur notre protocole <ArrowRight className="w-5 h-5" />
@@ -351,9 +353,9 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStart, onLogin }) => {
               <span className="text-sm font-black tracking-tighter uppercase">PERASafe © 2026</span>
            </div>
            <div className="flex gap-8 text-[10px] font-black text-slate-400 uppercase tracking-widest">
-              <a href="#" className="hover:text-indigo-600">Légal</a>
-              <a href="#" className="hover:text-indigo-600">Confidentialité</a>
-              <a href="#" className="hover:text-indigo-600">Contact</a>
+              <button onClick={onViewPrivacy} className="hover:text-indigo-600">Légal</button>
+              <button onClick={onViewPrivacy} className="hover:text-indigo-600">Confidentialité</button>
+              <button onClick={() => window.open('mailto:support@perasafe.cloud')} className="hover:text-indigo-600">Contact</button>
            </div>
         </div>
       </footer>
