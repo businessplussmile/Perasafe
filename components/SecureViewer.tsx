@@ -3,6 +3,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { SecureDocument } from '../types';
 import { useSecurity } from '../hooks/useSecurity';
 import { decryptContent } from '../services/geminiService';
+import { Sparkles } from 'lucide-react';
 
 interface SecureViewerProps {
   document: SecureDocument;
@@ -203,6 +204,18 @@ const SecureViewer: React.FC<SecureViewerProps> = ({ document: doc, onExit, isAd
                          CE DOCUMENT EST LA PROPRIÉTÉ EXCLUSIVE DE PERAFIND. TOUTE REPRODUCTION OU DIVULGATION CONSTITUE UNE FAUTE GRAVE.
                       </p>
                    </div>
+
+                   {doc.summary && (
+                     <div className="mt-12 w-full max-w-2xl bg-indigo-50/50 p-6 rounded-[2rem] border border-indigo-100 flex gap-4 items-start animate-fade-in shadow-inner">
+                        <div className="w-10 h-10 bg-indigo-600 rounded-2xl flex items-center justify-center text-white shrink-0 shadow-lg">
+                           <Sparkles className="w-5 h-5" />
+                        </div>
+                        <div className="space-y-1">
+                           <span className="text-[9px] font-black text-indigo-600 uppercase tracking-widest block mb-1">Analyse Stratégique IA</span>
+                           <p className="text-[13px] text-slate-700 leading-relaxed font-medium italic">"{doc.summary}"</p>
+                        </div>
+                     </div>
+                   )}
 
                    <div className="w-full h-[1px] bg-slate-100 mt-16 max-w-6xl mx-auto"></div>
                 </div>

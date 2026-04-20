@@ -1,6 +1,8 @@
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { SecureDocument } from '../types';
+import { summarizeDocument } from '../services/geminiService';
+import { Sparkles, Loader2 } from 'lucide-react';
 
 interface AdminPanelProps {
   documents: SecureDocument[];
@@ -47,6 +49,9 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ documents, onAddDocument, onImp
   const [stats, setStats] = useState({ words: 0, time: 0 });
   const [activeFont, setActiveFont] = useState(FONTS[0].value);
   const [showInstructions, setShowInstructions] = useState(true);
+  const [isSummarizing, setIsSummarizing] = useState(false);
+  const [aiSummary, setAiSummary] = useState('');
+  const [validityDuration, setValidityDuration] = useState(86400000); // Default: 24h in ms
   
   const [editingDoc, setEditingDoc] = useState<SecureDocument | null>(null);
   const [newCodeInput, setNewCodeInput] = useState('');
@@ -115,6 +120,12 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ documents, onAddDocument, onImp
     e.target.value = ''; 
   };
 
+  const handleShareLink = () => {
+    const url = `${window.location.origin}?import=true`;
+    navigator.clipboard.writeText(url);
+    showToast("Lien d'accès copié !");
+  };
+
   const updateStats = useCallback(() => {
     const text = editorRef.current?.innerText || '';
     const words = text.trim() ? text.trim().split(/\s+/).length : 0;
@@ -148,9 +159,27 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ documents, onAddDocument, onImp
       return;
     }
     const partnerIds = partnerEmails.split(',').map(email => email.trim()).filter(email => email !== '');
-    onAddDocument({ title, content, mimeType: 'text/html', accessCode: code, partnerIds });
+    onAddDocument({ title, content, mimeType: 'text/html', accessCode: code, partnerIds, summary: aiSummary, validityDuration });
     showToast("Document ajouté avec succès.");
     resetForm();
+  };
+
+  const generateAISummary = async () => {
+    const content = editorRef.current?.innerText || '';
+    if (!content || content.length < 50) {
+      showToast("Contenu trop court pour l'analyse IA.", 'error');
+      return;
+    }
+    setIsSummarizing(true);
+    try {
+      const summary = await summarizeDocument(content);
+      setAiSummary(summary);
+      showToast("Synthèse IA générée.");
+    } catch (error) {
+      showToast("Erreur lors de l'analyse IA.", 'error');
+    } finally {
+      setIsSummarizing(false);
+    }
   };
 
   const resetForm = () => {
@@ -158,6 +187,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ documents, onAddDocument, onImp
     if (editorRef.current) editorRef.current.innerHTML = '';
     setCode('');
     setPartnerEmails('');
+    setAiSummary('');
     setStats({ words: 0, time: 0 });
   };
 
@@ -237,7 +267,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ documents, onAddDocument, onImp
         </div>
       )}
 
-      <section className="bg-white rounded-[2rem] shadow-2xl border border-slate-100 overflow-hidden">
+      <section id="tour-admin-editor" className="bg-white rounded-[2rem] shadow-2xl border border-slate-100 overflow-hidden">
         <form onSubmit={handleSubmit}>
           <div className="bg-slate-50/80 p-6 md:p-10 border-b border-slate-100 flex flex-col md:flex-row justify-between gap-6 items-start md:items-center">
             <div className="flex-1 w-full space-y-3">
@@ -245,7 +275,18 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ documents, onAddDocument, onImp
                 <div className="w-10 h-10 bg-[#643012] rounded-xl flex items-center justify-center text-[#F2AF31] shadow-xl">
                   <i className="fas fa-pen-nib text-sm"></i>
                 </div>
-                <h2 className="text-xl font-black text-slate-900 uppercase tracking-tighter">Rédaction Stratégique</h2>
+                <div className="flex-1 flex justify-between items-center">
+                  <h2 className="text-xl font-black text-slate-900 uppercase tracking-tighter">Rédaction Stratégique</h2>
+                  <button 
+                    type="button"
+                    onClick={generateAISummary}
+                    disabled={isSummarizing}
+                    className="flex items-center gap-2 px-4 py-2 bg-indigo-50 text-indigo-600 rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-indigo-100 transition-all disabled:opacity-50"
+                  >
+                    {isSummarizing ? <Loader2 className="w-3 h-3 animate-spin"/> : <Sparkles className="w-3 h-3" />}
+                    {isSummarizing ? 'Analyse...' : 'Synthèse IA'}
+                  </button>
+                </div>
               </div>
               <input 
                 type="text" 
@@ -254,8 +295,16 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ documents, onAddDocument, onImp
                 className="w-full bg-transparent border-b-2 border-slate-200 py-2 text-2xl font-black text-slate-900 outline-none focus:border-[#F2AF31] transition-all"
                 placeholder="Titre du document..."
               />
+              {aiSummary && (
+                <div className="bg-indigo-50/50 p-4 rounded-xl border border-indigo-100 animate-fade-in">
+                  <p className="text-[10px] font-bold text-indigo-600 uppercase tracking-widest flex items-center gap-2 mb-1">
+                    <Sparkles className="w-2.5 h-2.5" /> Résumé Stratégique (IA)
+                  </p>
+                  <p className="text-[11px] text-slate-600 italic">"{aiSummary}"</p>
+                </div>
+              )}
             </div>
-            <div className="w-full md:w-auto shrink-0 flex flex-col md:flex-row gap-4">
+            <div id="tour-admin-settings" className="w-full md:w-auto shrink-0 flex flex-col md:flex-row gap-4">
               <div>
                 <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Partenaires (emails séparés par virgule)</label>
                 <input 
@@ -265,6 +314,20 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ documents, onAddDocument, onImp
                   className="bg-white border-2 border-slate-100 rounded-xl p-4 text-slate-600 font-bold w-full md:w-[300px] outline-none shadow-inner focus:border-indigo-600"
                   placeholder="partenaire@email.com, ..."
                 />
+              </div>
+              <div>
+                <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Durée de validité (après ouverture)</label>
+                <select 
+                  value={validityDuration}
+                  onChange={(e) => setValidityDuration(Number(e.target.value))}
+                  className="bg-white border-2 border-slate-100 rounded-xl p-4 text-slate-600 font-bold w-full md:w-[180px] outline-none shadow-inner focus:border-indigo-600 cursor-pointer appearance-none"
+                >
+                  <option value={3600000}>1 Heure</option>
+                  <option value={43200000}>12 Heures</option>
+                  <option value={86400000}>24 Heures</option>
+                  <option value={172800000}>48 Heures</option>
+                  <option value={604800000}>7 Jours</option>
+                </select>
               </div>
               <div>
                 <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Code d'accès requis</label>
@@ -295,8 +358,9 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ documents, onAddDocument, onImp
               <select 
                 onChange={(e) => document.execCommand('fontSize', false, e.target.value)}
                 className="bg-slate-50 border border-slate-100 rounded-lg px-2 py-1.5 text-[9px] font-bold text-slate-600 outline-none cursor-pointer"
+                defaultValue={'3'}
               >
-                {SIZES.map(s => <option key={s.value} value={s.value} selected={s.value === '3'}>{s.label}</option>)}
+                {SIZES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
               </select>
             </div>
 
@@ -417,6 +481,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ documents, onAddDocument, onImp
                 Vider
               </button>
               <button 
+                id="tour-admin-save"
                 type="submit" 
                 className="flex-1 md:flex-none bg-indigo-600 text-white font-black px-10 py-4 md:py-6 rounded-2xl text-[9px] md:text-[10px] uppercase tracking-widest shadow-lg btn-active transition-all"
               >
@@ -427,7 +492,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ documents, onAddDocument, onImp
         </form>
       </section>
 
-      <section className="bg-white rounded-[2rem] overflow-hidden border border-slate-100 shadow-xl">
+      <section id="tour-admin-inventory" className="bg-white rounded-[2rem] overflow-hidden border border-slate-100 shadow-xl">
         <div className="p-8 md:p-12 border-b border-slate-50 flex flex-col md:flex-row justify-between items-start md:items-center gap-8 bg-slate-50/20">
           <div>
              <h3 className="font-black text-2xl text-slate-900 uppercase tracking-tighter">Packages Actifs</h3>
@@ -457,7 +522,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ documents, onAddDocument, onImp
                 <th className="px-8 py-6">ID du Package</th>
                 <th className="px-8 py-6">Code Pivot</th>
                 <th className="px-8 py-6 text-center">Status</th>
-                <th className="px-8 py-6 text-right">Opérations</th>
+                <th id="tour-admin-actions" className="px-8 py-6 text-right">Opérations</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -488,6 +553,13 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ documents, onAddDocument, onImp
                       </button>
                     </td>
                     <td className="px-8 py-8 text-right whitespace-nowrap">
+                      <button 
+                        onClick={handleShareLink} 
+                        className="text-emerald-500 p-3 hover:bg-emerald-50 rounded-xl transition-all mr-2" 
+                        title="Copier le lien partenaire"
+                      >
+                        <i className="fas fa-link text-xs"></i>
+                      </button>
                       <button 
                         onClick={() => { setEditingDoc(doc); setNewCodeInput(doc.accessCode); }} 
                         className="text-indigo-600 p-3 hover:bg-indigo-50 rounded-xl transition-all mr-2" 

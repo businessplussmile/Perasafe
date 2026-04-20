@@ -5,12 +5,16 @@ import AdminPanel from './components/AdminPanel';
 import UserDocGrid from './components/UserDocGrid';
 import SecureViewer from './components/SecureViewer';
 import LoginPortal from './components/LoginPortal';
+import OnboardingFlow from './components/OnboardingFlow';
 import GreetingAnimation from './components/GreetingAnimation';
-import { encryptContent, decryptContent } from './services/geminiService';
+import SuperAdminPanel from './components/SuperAdminPanel';
+import LandingPage from './components/LandingPage';
+import ProductTour from './components/ProductTour';
+import { encryptContent, decryptContent, summarizeDocument } from './services/geminiService';
 import { useAuth } from './hooks/useAuth';
 import { db, signOut } from './services/firebaseService';
 import { collection, query, where, onSnapshot, doc, updateDoc, deleteDoc, setDoc, addDoc, serverTimestamp, getDoc, collectionGroup } from 'firebase/firestore';
-import { LogOut, ShieldCheck, Settings, Users, PieChart, CreditCard, ChevronRight, Bell, Search, Plus } from 'lucide-react';
+import { LogOut, ShieldCheck, Settings, Users, PieChart, CreditCard, ChevronRight, Bell, Search, Plus, CheckCircle2, Ban } from 'lucide-react';
 
 const LIFESPAN_MS = 24 * 60 * 60 * 1000; // 24 heures
 
@@ -21,14 +25,62 @@ const MemoizedAdminPanel = React.memo(AdminPanel);
 const App: React.FC = () => {
   const { user, profile, loading: authLoading } = useAuth();
   const [showGreeting, setShowGreeting] = useState(false);
-  const [viewMode, setViewMode] = useState<ViewMode>('USER');
+  const [viewMode, setViewMode] = useState<ViewMode>('LANDING');
   const [documents, setDocuments] = useState<SecureDocument[]>([]);
   const [activeDoc, setActiveDoc] = useState<SecureDocument | null>(null);
   const [transitioning, setTransitioning] = useState(false);
   const [docToDelete, setDocToDelete] = useState<string | null>(null);
   const [isSubscriptionModalOpen, setIsSubscriptionModalOpen] = useState(false);
 
+  // Écran de compte bloqué
+  if (profile?.isBlocked) {
+    return (
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center p-6 text-center">
+        <div className="bg-white rounded-[3rem] p-12 max-w-md shadow-2xl animate-in zoom-in duration-300">
+          <div className="w-20 h-20 bg-red-100 text-red-600 rounded-3xl flex items-center justify-center mx-auto mb-8 animate-pulse">
+            <Ban className="w-10 h-10" />
+          </div>
+          <h1 className="text-2xl font-black text-slate-900 uppercase tracking-tighter mb-4">Compte Suspendu</h1>
+          <p className="text-slate-500 text-xs font-medium leading-relaxed mb-8 uppercase tracking-widest">
+            Votre accès à la plateforme a été suspendu par un administrateur. 
+            Veuillez contacter le support pour plus d'informations.
+          </p>
+          <button 
+            onClick={() => signOut()}
+            className="w-full py-4 bg-slate-900 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-slate-800 transition-all shadow-xl"
+          >
+            Déconnexion
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Auto-redirect to login if partner link is used
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('import') === 'true' && !user) {
+      setViewMode('LOGIN');
+    }
+  }, [user]);
+
   // Synchronisation avec Firestore
+  useEffect(() => {
+    if (user && viewMode === 'LANDING') {
+      setViewMode('USER');
+    }
+  }, [user, viewMode]);
+
+  useEffect(() => {
+    if (user && profile) {
+      if (!profile.onboardingCompleted && profile.role !== 'ADMIN') {
+        setViewMode('ONBOARDING');
+      } else if (viewMode === 'ONBOARDING') {
+        setViewMode('USER');
+      }
+    }
+  }, [user, profile, viewMode]);
+
   useEffect(() => {
     if (!profile) {
       setDocuments([]);
@@ -39,9 +91,12 @@ const App: React.FC = () => {
     if (profile.role === 'COMPANY_OWNER') {
       // Les entreprises voient leurs propres documents
       q = query(collection(db, 'companies', profile.companyId || 'default', 'documents'));
-    } else {
+    } else if (profile.role === 'PARTNER') {
       // Les partenaires voient les documents où ils sont listés via collectionGroup
       q = query(collectionGroup(db, 'documents'), where('partnerIds', 'array-contains', profile.email));
+    } else {
+      // ADMIN shouldn't query documents here
+      return;
     }
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -63,7 +118,8 @@ const App: React.FC = () => {
       const now = Date.now();
       for (const docItem of documents) {
         if (docItem.lifespanStart && !docItem.isConsumed) {
-          if (now - docItem.lifespanStart >= LIFESPAN_MS) {
+          const duration = docItem.validityDuration || LIFESPAN_MS;
+          if (now - docItem.lifespanStart >= duration) {
             const docRef = doc(db, 'companies', profile.companyId!, 'documents', docItem.id);
             await updateDoc(docRef, { isConsumed: true });
           }
@@ -93,19 +149,31 @@ const App: React.FC = () => {
   const addDocument = useCallback(async (docData: Omit<SecureDocument, 'id' | 'createdAt' | 'isConsumed' | 'companyId' | 'uploaderId'>) => {
     if (!profile || profile.role !== 'COMPANY_OWNER') return;
 
+    // Vérification de l'abonnement
+    let limit = 5;
+    if (profile.subscriptionTier === 'PRO') limit = 50;
+    if (profile.subscriptionTier === 'BUSINESS') limit = 300;
+
+    if (documents.length >= limit) {
+      alert(`Limite atteinte (${limit} documents). Passez au niveau supérieur pour ajouter plus de fichiers.`);
+      return;
+    }
+
     const encryptedContent = encryptContent(docData.content, docData.accessCode);
-    const newDocRef = collection(db, 'companies', profile.companyId!, 'documents');
+    const newDocRef = doc(collection(db, 'companies', profile.companyId!, 'documents'));
     
-    await addDoc(newDocRef, {
+    await setDoc(newDocRef, {
       ...docData,
+      id: newDocRef.id,
       content: encryptedContent,
       createdAt: Date.now(),
       isConsumed: false,
       companyId: profile.companyId,
       uploaderId: profile.uid,
-      partnerIds: docData.partnerIds || []
+      partnerIds: docData.partnerIds || [],
+      summary: docData.summary || ''
     });
-  }, [profile]);
+  }, [profile, documents]);
 
   const onOpenDocRequest = useCallback(async (document: SecureDocument, code: string) => {
     if (!profile) return;
@@ -167,6 +235,24 @@ const App: React.FC = () => {
     setDocToDelete(null);
   }, [docToDelete, activeDoc, switchView, profile]);
 
+  const upgradeSubscription = useCallback(async (tier: 'PRO' | 'BUSINESS') => {
+    if (!profile || profile.role !== 'COMPANY_OWNER') return;
+    
+    try {
+      const userRef = doc(db, 'users', profile.uid);
+      await updateDoc(userRef, { 
+        subscriptionStatus: 'PENDING',
+        requestedTier: tier
+      });
+      
+      alert(`Demande pour le plan ${tier} transmise. Validation en cours par l'admin.`);
+      setIsSubscriptionModalOpen(false);
+    } catch (error) {
+      console.error("Upgrade request error:", error);
+      alert("Erreur lors de la demande.");
+    }
+  }, [profile]);
+
   const handleSignOut = () => {
     signOut();
     switchView('USER');
@@ -196,12 +282,22 @@ const App: React.FC = () => {
                 {profile.role === 'COMPANY_OWNER' && (
                   <button 
                     onClick={() => setIsSubscriptionModalOpen(true)}
-                    className="ml-2 bg-indigo-100 text-indigo-600 px-2 py-0.5 rounded-full text-[8px] font-black uppercase"
+                    className={`ml-2 px-2 py-0.5 rounded-full text-[8px] font-black uppercase ${(profile.subscriptionTier === 'PRO' || profile.subscriptionTier === 'BUSINESS') ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-200 text-slate-500'}`}
                   >
-                    PREMIUM
+                    {profile.subscriptionTier === 'PRO' ? 'PRO' : (profile.subscriptionTier === 'BUSINESS' ? 'BUSINESS' : (profile.subscriptionStatus === 'PENDING' ? 'ATTENTE VAL.' : 'STANDARD'))}
                   </button>
                 )}
               </div>
+            )}
+
+            {profile?.role === 'ADMIN' && (
+              <button 
+                onClick={() => switchView(viewMode === 'SUBSCRIPTION' ? 'USER' : 'SUBSCRIPTION')} 
+                className={`px-4 md:px-6 py-2.5 md:py-3 rounded-xl md:rounded-2xl font-black text-[9px] md:text-[10px] uppercase tracking-widest transition-all btn-active flex items-center gap-2 ${viewMode === 'SUBSCRIPTION' ? 'bg-slate-100 text-slate-600' : 'bg-orange-500 text-white shadow-xl shadow-orange-500/10'}`}
+              >
+                {viewMode === 'SUBSCRIPTION' ? <Users className="w-3 h-3" /> : <ShieldCheck className="w-3 h-3" />}
+                <span className="hidden md:inline">{viewMode === 'SUBSCRIPTION' ? 'Registre' : 'Console Super-Admin'}</span>
+              </button>
             )}
 
             {profile?.role === 'COMPANY_OWNER' && (
@@ -240,8 +336,27 @@ const App: React.FC = () => {
     );
   }
 
-  if (!user) {
-    return <LoginPortal />;
+  if (!user || (viewMode === 'ONBOARDING' && !profile)) {
+    if (viewMode === 'LOGIN' || viewMode === 'ONBOARDING') {
+      return <LoginPortal onBack={() => setViewMode('LANDING')} />;
+    }
+    return (
+      <LandingPage 
+        onStart={() => setViewMode('LOGIN')} 
+        onLogin={() => setViewMode('LOGIN')} 
+      />
+    );
+  }
+
+  if (viewMode === 'ONBOARDING' && profile) {
+    return <OnboardingFlow profile={profile} onComplete={() => {}} onReturnToLanding={async () => {
+      try {
+        await signOut();
+        setViewMode('LANDING');
+      } catch (e) {
+        console.error(e);
+      }
+    }} />;
   }
 
   if (showGreeting && profile) {
@@ -251,6 +366,11 @@ const App: React.FC = () => {
   return (
     <div className="min-h-screen flex flex-col selection:bg-indigo-100 bg-[#f8fafc]">
       {header}
+      
+      {/* Product Tour Overlay */}
+      {profile && (viewMode === 'ADMIN' || viewMode === 'USER') && (
+        <ProductTour role={profile.role === 'COMPANY_OWNER' ? 'COMPANY_OWNER' : 'PARTNER'} userId={profile.uid} />
+      )}
 
       <main className={`flex-1 relative transition-all duration-500 ${transitioning ? 'opacity-0 scale-95 blur-sm' : 'opacity-100 scale-100 blur-0'}`}>
         {viewMode === 'USER' && (
@@ -262,17 +382,20 @@ const App: React.FC = () => {
             onImportDocuments={() => {}} 
           />
         )}
-        {viewMode === 'ADMIN' && profile?.role === 'COMPANY_OWNER' && (
-          <MemoizedAdminPanel 
-            documents={documents} 
-            onAddDocument={addDocument} 
-            onImportDocuments={() => {}} 
-            onUpdateCode={updateDocCode} 
-            onToggleStatus={toggleDocStatus} 
-            onDeleteDocument={setDocToDelete} 
-          />
-        )}
-        {viewMode === 'VIEWER' && activeDoc && (
+          {viewMode === 'ADMIN' && profile?.role === 'COMPANY_OWNER' && (
+            <MemoizedAdminPanel 
+              documents={documents} 
+              onAddDocument={addDocument} 
+              onImportDocuments={() => {}} 
+              onUpdateCode={updateDocCode} 
+              onToggleStatus={toggleDocStatus} 
+              onDeleteDocument={setDocToDelete} 
+            />
+          )}
+          {viewMode === 'SUBSCRIPTION' && profile?.role === 'ADMIN' && (
+            <SuperAdminPanel />
+          )}
+          {viewMode === 'VIEWER' && activeDoc && (
           <SecureViewer 
             document={activeDoc} 
             onExit={() => switchView('USER')} 
@@ -291,29 +414,71 @@ const App: React.FC = () => {
               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] mt-2">Scale your security node</p>
             </div>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
-              <div className="p-6 rounded-3xl border-2 border-indigo-600 bg-indigo-50/30">
-                <span className="text-[9px] font-black text-indigo-600 uppercase tracking-widest">Premium</span>
-                <div className="text-3xl font-black text-slate-900 mt-2">49€<span className="text-sm font-bold text-slate-400">/mois</span></div>
-                <ul className="mt-4 space-y-2">
-                  <li className="text-[10px] font-bold text-slate-600 flex items-center gap-2"><div className="w-1 h-1 bg-indigo-600 rounded-full"></div> Documents Illimités</li>
-                  <li className="text-[10px] font-bold text-slate-600 flex items-center gap-2"><div className="w-1 h-1 bg-indigo-600 rounded-full"></div> Partenaires Illimités</li>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+              {/* Standard */}
+              <div className={`p-5 rounded-[2rem] border-2 transition-all flex flex-col h-full ${profile?.subscriptionTier === 'STANDARD' ? 'border-indigo-600 bg-indigo-50/20' : 'border-slate-50 bg-slate-50 opacity-80'}`}>
+                <div className="mb-4">
+                  <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Initial</span>
+                  <h4 className="text-lg font-black text-slate-900 tracking-tighter uppercase">Standard</h4>
+                  <div className="text-xl font-black text-slate-800 mt-1">500<span className="text-[10px] text-slate-400 ml-1">FCFA/mois</span></div>
+                </div>
+                <ul className="space-y-2 mb-6 flex-1">
+                  <li className="text-[9px] font-bold text-slate-500 flex items-center gap-2"><CheckCircle2 className="w-3 h-3 text-indigo-500" /> 5 Documents/mois</li>
+                  <li className="text-[9px] font-bold text-slate-500 flex items-center gap-2"><CheckCircle2 className="w-3 h-3 text-indigo-500" /> Support Mail</li>
                 </ul>
-                <button className="w-full mt-6 bg-indigo-600 text-white font-black py-3 rounded-xl text-[10px] uppercase tracking-widest">Actif</button>
+                <button disabled className="w-full bg-slate-200 text-slate-400 font-black py-3 rounded-2xl text-[9px] uppercase tracking-widest">
+                  {profile?.subscriptionTier === 'STANDARD' ? 'Actuel' : 'Basique'}
+                </button>
               </div>
-              
-              <div className="p-6 rounded-3xl border border-slate-100 bg-slate-50 opacity-60">
-                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Entreprise</span>
-                <div className="text-3xl font-black text-slate-900 mt-2">Sur Devis</div>
-                <ul className="mt-4 space-y-2">
-                  <li className="text-[10px] font-bold text-slate-600 flex items-center gap-2"><div className="w-1 h-1 bg-slate-400 rounded-full"></div> Multi-Teams</li>
-                  <li className="text-[10px] font-bold text-slate-600 flex items-center gap-2"><div className="w-1 h-1 bg-slate-400 rounded-full"></div> API Access</li>
+
+              {/* Pro */}
+              <div className={`p-5 rounded-[2rem] border-2 transition-all flex flex-col h-full ${profile?.subscriptionTier === 'PRO' ? 'border-indigo-600 bg-indigo-50/20' : (profile?.requestedTier === 'PRO' && profile?.subscriptionStatus === 'PENDING' ? 'border-orange-400 bg-orange-50/20' : 'border-slate-50 shadow-sm')}`}>
+                <div className="mb-4">
+                  <span className="text-[8px] font-black text-indigo-600 uppercase tracking-widest">Populaire</span>
+                  <h4 className="text-lg font-black text-slate-900 tracking-tighter uppercase">Pro</h4>
+                  <div className="text-xl font-black text-slate-800 mt-1">2000<span className="text-[10px] text-slate-400 ml-1">FCFA/mois</span></div>
+                </div>
+                <ul className="space-y-2 mb-6 flex-1">
+                  <li className="text-[9px] font-bold text-slate-500 flex items-center gap-2"><CheckCircle2 className="w-3 h-3 text-indigo-500" /> 50 Documents/mois</li>
+                  <li className="text-[9px] font-bold text-slate-500 flex items-center gap-2"><CheckCircle2 className="w-3 h-3 text-indigo-500" /> IA Illimitée</li>
                 </ul>
-                <button disabled className="w-full mt-6 bg-slate-200 text-slate-400 font-black py-3 rounded-xl text-[10px] uppercase tracking-widest">Bientôt</button>
+                <button 
+                  onClick={() => upgradeSubscription('PRO')}
+                  disabled={profile?.subscriptionTier === 'PRO' || profile?.subscriptionStatus === 'PENDING'}
+                  className="w-full bg-indigo-600 text-white font-black py-3 rounded-2xl text-[9px] uppercase tracking-widest shadow-lg shadow-indigo-600/20 disabled:bg-slate-200 disabled:text-slate-400"
+                >
+                  {profile?.subscriptionTier === 'PRO' ? 'Actif' : (profile?.requestedTier === 'PRO' && profile?.subscriptionStatus === 'PENDING' ? 'En attente' : 'Choisir Pro')}
+                </button>
+              </div>
+
+              {/* Business */}
+              <div className={`p-5 rounded-[2rem] border-2 transition-all flex flex-col h-full ${profile?.subscriptionTier === 'BUSINESS' ? 'border-indigo-600 bg-indigo-50/20' : (profile?.requestedTier === 'BUSINESS' && profile?.subscriptionStatus === 'PENDING' ? 'border-orange-400 bg-orange-50/20' : 'border-slate-50 shadow-sm')}`}>
+                <div className="mb-4">
+                  <span className="text-[8px] font-black text-indigo-600 uppercase tracking-widest">Élite</span>
+                  <h4 className="text-lg font-black text-slate-900 tracking-tighter uppercase">Business</h4>
+                  <div className="text-xl font-black text-slate-800 mt-1">5500<span className="text-[10px] text-slate-400 ml-1">FCFA/mois</span></div>
+                </div>
+                <ul className="space-y-2 mb-6 flex-1">
+                  <li className="text-[9px] font-bold text-slate-500 flex items-center gap-2"><CheckCircle2 className="w-3 h-3 text-indigo-500" /> 300 Documents/mois</li>
+                  <li className="text-[9px] font-bold text-slate-500 flex items-center gap-2"><CheckCircle2 className="w-3 h-3 text-indigo-500" /> Multi-utilisateurs</li>
+                </ul>
+                <button 
+                  onClick={() => upgradeSubscription('BUSINESS')}
+                  disabled={profile?.subscriptionTier === 'BUSINESS' || profile?.subscriptionStatus === 'PENDING'}
+                  className="w-full bg-slate-900 text-white font-black py-3 rounded-2xl text-[9px] uppercase tracking-widest shadow-lg shadow-slate-900/20 disabled:bg-slate-200 disabled:text-slate-400"
+                >
+                  {profile?.subscriptionTier === 'BUSINESS' ? 'Actif' : (profile?.requestedTier === 'BUSINESS' && profile?.subscriptionStatus === 'PENDING' ? 'En attente' : 'Choisir Biz')}
+                </button>
               </div>
             </div>
 
-            <button onClick={() => setIsSubscriptionModalOpen(false)} className="w-full text-slate-400 font-bold py-2 text-[9px] uppercase tracking-widest">Retour au console</button>
+            <div className="bg-slate-50 rounded-3xl p-6 border border-slate-100 mb-8">
+              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest text-center leading-relaxed">
+                Le passage aux plans PRO ou BUSINESS nécessite une validation manuelle sécurisée par nos administrateurs.
+              </p>
+            </div>
+
+            <button onClick={() => setIsSubscriptionModalOpen(false)} className="w-full text-slate-400 hover:text-indigo-600 font-bold py-2 text-[9px] uppercase tracking-widest transition-colors">Fermer la console</button>
           </div>
         </div>
       )}

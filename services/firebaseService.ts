@@ -21,14 +21,7 @@ export const signInWithGoogle = async () => {
 
 export const signOut = () => auth.signOut();
 
-export interface UserProfile {
-  uid: string;
-  email: string;
-  role: 'ADMIN' | 'COMPANY_OWNER' | 'PARTNER';
-  companyId?: string;
-  name?: string;
-  createdAt: number;
-}
+import { UserProfile } from '../types';
 
 export const getUserProfile = async (uid: string): Promise<UserProfile | null> => {
   const userRef = doc(db, 'users', uid);

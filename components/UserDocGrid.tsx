@@ -55,6 +55,15 @@ const UserDocGrid: React.FC<UserDocGridProps> = ({ documents, onOpenDoc, isAdmin
     e.target.value = ''; 
   };
 
+  React.useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('import') === 'true') {
+      setTimeout(() => {
+        importFileInputRef.current?.click();
+      }, 500); // slight delay for smooth entry
+    }
+  }, []);
+
   return (
     <div className="max-w-7xl mx-auto px-4 md:px-16 animate-fade-in pb-40 pt-8 md:pt-16">
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 md:gap-10 mb-10 md:mb-20">
@@ -75,6 +84,7 @@ const UserDocGrid: React.FC<UserDocGridProps> = ({ documents, onOpenDoc, isAdmin
           <div className="flex items-center w-full sm:w-auto">
             <input type="file" ref={importFileInputRef} className="hidden" accept=".peravault" onChange={handleImport} />
             <button 
+              id="tour-user-import"
               onClick={() => importFileInputRef.current?.click()}
               className="w-full sm:w-auto bg-white border border-slate-200 text-slate-500 px-4 md:px-5 py-3 rounded-xl text-[9px] font-black uppercase tracking-widest shadow-sm btn-active hover:bg-slate-50 transition-all flex items-center justify-center gap-2"
             >
@@ -94,7 +104,7 @@ const UserDocGrid: React.FC<UserDocGridProps> = ({ documents, onOpenDoc, isAdmin
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-10">
+      <div id="tour-user-vault" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-10">
         {documents.map(doc => (
           <div 
             key={doc.id}

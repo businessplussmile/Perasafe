@@ -19,7 +19,16 @@ service cloud.firestore {
       return get(/databases/$(database)/documents/users/$(uid)).data;
     }
     function isAdmin() {
-      return isVerified() && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+      // Direct email check for the app owner and role check for scalability
+      return isVerified() && (request.auth.token.email == 'jorisahoussi4@gmail.com' || getUserData(request.auth.uid).role == 'ADMIN');
+    }
+
+    function isNotBlocked() {
+       return !('isBlocked' in getUserData(request.auth.uid)) || getUserData(request.auth.uid).isBlocked == false;
+    }
+    
+    function canAccess() {
+       return isVerified() && isNotBlocked();
     }
 
     // --- PHASE 4: Entity Match Blocks ---
@@ -27,58 +36,64 @@ service cloud.firestore {
     // 1. Users Collection
     match /users/{userId} {
       allow get: if isVerified() && (request.auth.uid == userId || isAdmin());
-      // No blanket list of users
+      allow list: if isVerified() && isAdmin();
       
       function isValidUser(data) {
         return data.keys().hasAll(['uid', 'email', 'role', 'createdAt']) &&
-               data.keys().size() <= 10 &&
-               data.uid == request.auth.uid &&
-               data.email == request.auth.token.email &&
-               data.role in ['COMPANY_OWNER', 'PARTNER'] &&
-               data.createdAt is number && (data.createdAt == request.time.toMillis() || data.createdAt == request.resource.data.createdAt); // Handle both Timestamp and ms if app uses Date.now()
+               data.keys().size() <= 16 &&
+               data.uid == userId && // Ensure UID matches document ID
+               data.email is string &&
+               data.role in ['ADMIN', 'COMPANY_OWNER', 'PARTNER'] &&
+               data.createdAt is number &&
+               (!('isBlocked' in data) || data.isBlocked is bool);
       }
 
       allow create: if isVerified() && isValidId(userId) && userId == request.auth.uid && isValidUser(incoming());
-      allow update: if isVerified() && request.auth.uid == userId && 
-                       isValidUser(incoming()) &&
-                       incoming().uid == existing().uid &&
-                       incoming().email == existing().email &&
-                       incoming().role == existing().role && // Immutable role
-                       incoming().diff(existing()).affectedKeys().hasOnly(['name', 'companyId']);
+      allow update: if isVerified() && (
+                       (request.auth.uid == userId && isNotBlocked() &&
+                        incoming().uid == existing().uid &&
+                        incoming().email == existing().email &&
+                        incoming().role == existing().role && // Immutable role for self
+                        !('isBlocked' in incoming()) && 
+                        incoming().diff(existing()).affectedKeys().hasOnly(['name', 'companyId', 'subscriptionStatus', 'requestedTier', 'onboardingData']) &&
+                        // Cannot modify onboardingCompleted themselves
+                        (incoming().subscriptionStatus in ['NONE', 'PENDING'])
+                       ) || isAdmin()
+                     );
+      allow delete: if isAdmin();
     }
 
     // 2. Companies Collection
     match /companies/{companyId} {
-      allow get: if isVerified(); // Companies are semi-public for lookups if needed, but usually linked
+      allow get, list: if canAccess() || isAdmin(); 
       
       function isValidCompany(data) {
         return data.keys().hasAll(['id', 'name', 'ownerId', 'subscriptionStatus', 'createdAt']) &&
                data.id == companyId &&
                data.name is string && data.name.size() <= 200 &&
-               data.ownerId == request.auth.uid &&
                data.subscriptionStatus in ['ACTIVE', 'INACTIVE', 'TRIAL'] &&
                data.createdAt is number;
       }
 
-      allow create: if isVerified() && isValidId(companyId) && isValidCompany(incoming());
-      allow update: if isVerified() && existing().ownerId == request.auth.uid && 
-                       isValidCompany(incoming()) &&
-                       incoming().ownerId == existing().ownerId &&
-                       incoming().diff(existing()).affectedKeys().hasOnly(['name', 'subscriptionStatus', 'subscriptionTier']);
+      allow create: if canAccess() && isValidId(companyId) && isValidCompany(incoming());
+      allow update: if (canAccess() || isAdmin()) && (existing().ownerId == request.auth.uid || isAdmin()) && 
+                       incoming().id == existing().id &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['name', 'subscriptionStatus', 'subscriptionTier', 'subscriptionExpiry']);
+      allow delete: if isAdmin();
     }
 
     // 3. Documents Sub-collection
     match /companies/{companyId}/documents/{docId} {
       function isCompanyOwner() {
-        return isVerified() && get(/databases/$(database)/documents/companies/$(companyId)).data.ownerId == request.auth.uid;
+        return canAccess() && get(/databases/$(database)/documents/companies/$(companyId)).data.ownerId == request.auth.uid;
       }
 
       function isPartner() {
-        return isVerified() && request.auth.token.email in existing().partnerIds;
+        return canAccess() && request.auth.token.email in existing().partnerIds;
       }
 
-      allow get: if isValidId(companyId) && isValidId(docId) && (isCompanyOwner() || isPartner());
-      allow list: if isValidId(companyId) && isCompanyOwner();
+      allow get: if isValidId(companyId) && isValidId(docId) && (isCompanyOwner() || isPartner() || isAdmin());
+      allow list: if isValidId(companyId) && (isCompanyOwner() || isAdmin());
 
       function isValidDoc(data) {
         return data.keys().hasAll(['id', 'title', 'content', 'accessCode', 'companyId', 'createdAt', 'uploaderId']) &&
@@ -91,30 +106,32 @@ service cloud.firestore {
                data.partnerIds is list && data.partnerIds.size() <= 100 &&
                data.createdAt is number &&
                (!('lifespanStart' in data) || data.lifespanStart == null || data.lifespanStart is number) &&
-               (!('lastCodeUsedAtOpening' in data) || data.lastCodeUsedAtOpening == null || data.lastCodeUsedAtOpening is string);
+               (!('lastCodeUsedAtOpening' in data) || data.lastCodeUsedAtOpening == null || data.lastCodeUsedAtOpening is string) &&
+               (!('validityDuration' in data) || data.validityDuration is number);
       }
 
-      allow create: if isVerified() && isValidId(companyId) && isValidId(docId) && isCompanyOwner() && isValidDoc(incoming());
+      allow create: if canAccess() && isValidId(companyId) && isValidId(docId) && isCompanyOwner() && isValidDoc(incoming());
       
-      allow update: if (isCompanyOwner() || isPartner()) && 
+      allow update: if (isCompanyOwner() || isPartner() || isAdmin()) && 
                        isValidId(companyId) && isValidId(docId) &&
-                       isValidDoc(incoming()) &&
-                       incoming().id == existing().id &&
-                       incoming().companyId == existing().companyId &&
-                       incoming().createdAt == existing().createdAt && (
+                       (isAdmin() || (isValidDoc(incoming()) &&
+                        incoming().id == existing().id &&
+                        incoming().companyId == existing().companyId &&
+                        incoming().createdAt == existing().createdAt)) && (
                          // Owner can update everything
-                         (isCompanyOwner() && incoming().diff(existing()).affectedKeys().hasOnly(['title', 'content', 'accessCode', 'isConsumed', 'partnerIds', 'lifespanStart', 'lastCodeUsedAtOpening'])) ||
+                         (isCompanyOwner() && incoming().diff(existing()).affectedKeys().hasOnly(['title', 'content', 'accessCode', 'isConsumed', 'partnerIds', 'lifespanStart', 'lastCodeUsedAtOpening', 'validityDuration'])) ||
                          // Partner can only update 'lifespanStart' and 'lastCodeUsedAtOpening' when opening for the first time
-                         (isPartner() && incoming().diff(existing()).affectedKeys().hasOnly(['lifespanStart', 'lastCodeUsedAtOpening']))
+                         (isPartner() && incoming().diff(existing()).affectedKeys().hasOnly(['lifespanStart', 'lastCodeUsedAtOpening'])) ||
+                         isAdmin()
                        );
 
-      allow delete: if isValidId(companyId) && isCompanyOwner();
+      allow delete: if (isValidId(companyId) && isCompanyOwner()) || isAdmin();
     }
 
     // 4. Secure List Queries for Partners (Collection Group)
     match /{path=**}/documents/{docId} {
       // Allows collectionGroup queries like: db.collectionGroup('documents').where('partnerIds', 'array-contains', userEmail)
-      allow list: if isVerified() && request.auth.token.email in resource.data.partnerIds;
+      allow list: if canAccess() && request.auth.token.email in resource.data.partnerIds;
     }
   }
 }

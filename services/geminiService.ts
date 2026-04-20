@@ -1,10 +1,14 @@
 
+import { GoogleGenAI } from "@google/genai";
+
 /**
  * PERADoc Strategic Security Processor
  * Chiffrement symétrique de haut niveau pour documents confidentiels.
  */
 
 const SYSTEM_SALT = "PERAFIND_SECURE_NODE_X14_SALT_2025";
+
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
 /**
  * Transforme le contenu en ciphertext illisible.
@@ -61,6 +65,26 @@ export const decryptContent = (ciphertext: string, key: string): string => {
   } catch (e) {
     console.warn("Decryption error : Clé invalide ou données corrompues.");
     return "ERREUR DE DÉCHIFFREMENT : Le contenu est protégé ou corrompu.";
+  }
+};
+
+/**
+ * Analyse intelligente du document avec Gemini
+ */
+export const summarizeDocument = async (content: string): Promise<string> => {
+  try {
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: `Analyse et résume ce document confidentiel en 2-3 phrases maximum. Sois précis et professionnel. Contenu : ${content}`,
+      config: {
+        systemInstruction: "Tu es un analyste en cybersécurité et conformité pour PERASafe Cloud. Ton rôle est de fournir des résumés stratégiques sans divulguer les secrets techniques.",
+      }
+    });
+
+    return response.text || "Synthèse indisponible.";
+  } catch (error) {
+    console.error("Gemini Analysis error:", error);
+    return "Échec de l'analyse IA.";
   }
 };
 
