@@ -327,7 +327,9 @@ const App: React.FC = () => {
     )
   ), [viewMode, switchView, user, profile]);
 
-  if (authLoading) {
+  const isPublicView = ['LANDING', 'PROTOCOL', 'PRIVACY', 'LOGIN'].includes(viewMode);
+
+  if (authLoading && !isPublicView) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50">
         <div className="flex flex-col items-center gap-4">
