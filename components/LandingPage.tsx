@@ -13,7 +13,7 @@ interface LandingPageProps {
 
 const LandingPage: React.FC<LandingPageProps> = ({ onStart, onLogin, onViewProtocol, onViewPrivacy }) => {
   return (
-    <div className="min-h-screen bg-white font-sans text-slate-900 overflow-x-hidden">
+    <div className="relative min-h-screen bg-white font-sans text-slate-900 overflow-x-hidden">
       {/* Header */}
       <header className="fixed top-0 left-0 right-0 z-[100] bg-white/80 backdrop-blur-xl border-b border-slate-100 h-20 flex items-center px-6 md:px-12">
         <div className="max-w-7xl mx-auto w-full flex justify-between items-center">
@@ -125,7 +125,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStart, onLogin, onViewProto
       </section>
 
       {/* Main Feature Section (Adobe Express vibe with split panels) */}
-      <section id="features" className="py-24 md:py-40 px-6">
+      <section id="features" className="relative py-24 md:py-40 px-6">
         <div className="max-w-7xl mx-auto">
           <div className="mb-20 text-center">
             <h2 className="text-3xl md:text-5xl font-black tracking-tighter mb-6 uppercase">Une nouvelle ère de<br />sécurité collaborative.</h2>
@@ -220,7 +220,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStart, onLogin, onViewProto
       </section>
 
       {/* Trust Grid */}
-      <section id="security" className="py-24 md:py-40 px-6">
+      <section id="security" className="relative py-24 md:py-40 px-6">
         <div className="max-w-7xl mx-auto">
           <div className="flex flex-col lg:flex-row gap-20 items-center">
             <div className="flex-1 space-y-10">
@@ -255,7 +255,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStart, onLogin, onViewProto
       </section>
 
       {/* Testimonials */}
-      <section className="py-24 bg-white">
+      <section className="relative py-24 bg-white">
         <div className="max-w-7xl mx-auto px-6">
           <div className="text-center mb-16">
             <h2 className="text-3xl md:text-5xl font-black tracking-tighter uppercase mb-4">Ils nous font <br />confiance.</h2>

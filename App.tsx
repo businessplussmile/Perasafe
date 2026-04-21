@@ -381,7 +381,7 @@ const App: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen flex flex-col selection:bg-indigo-100 bg-[#f8fafc]">
+    <div className="relative min-h-screen flex flex-col selection:bg-indigo-100 bg-[#f8fafc]">
       {header}
       
       {/* Product Tour Overlay */}
