@@ -40,12 +40,16 @@ service cloud.firestore {
       
       function isValidUser(data) {
         return data.keys().hasAll(['uid', 'email', 'role', 'createdAt']) &&
-               data.keys().size() <= 16 &&
+               data.keys().size() <= 20 &&
                data.uid == userId && // Ensure UID matches document ID
                data.email is string &&
                data.role in ['ADMIN', 'COMPANY_OWNER', 'PARTNER'] &&
                data.createdAt is number &&
-               (!('isBlocked' in data) || data.isBlocked is bool);
+               (!('isBlocked' in data) || data.isBlocked is bool) &&
+               (!('subscriptionTier' in data) || data.subscriptionTier in ['STANDARD', 'PRO', 'BUSINESS']) &&
+               (!('subscriptionStatus' in data) || data.subscriptionStatus in ['NONE', 'PENDING', 'ACTIVE']) &&
+               (!('subscriptionExpiresAt' in data) || data.subscriptionExpiresAt is number) &&
+               (!('onboardingCompleted' in data) || data.onboardingCompleted is bool);
       }
 
       allow create: if isVerified() && isValidId(userId) && userId == request.auth.uid && isValidUser(incoming());
@@ -55,9 +59,9 @@ service cloud.firestore {
                         incoming().email == existing().email &&
                         incoming().role == existing().role && // Immutable role for self
                         !('isBlocked' in incoming()) && 
-                        incoming().diff(existing()).affectedKeys().hasOnly(['name', 'companyId', 'subscriptionStatus', 'requestedTier', 'onboardingData']) &&
-                        // Cannot modify onboardingCompleted themselves
-                        (incoming().subscriptionStatus in ['NONE', 'PENDING'])
+                        incoming().diff(existing()).affectedKeys().hasOnly(['name', 'companyId', 'subscriptionStatus', 'requestedTier', 'onboardingData', 'onboardingCompleted', 'subscriptionTier', 'subscriptionExpiresAt']) &&
+                        // Logic guards for self-updates
+                        (incoming().subscriptionStatus in ['NONE', 'PENDING'] || isAdmin())
                        ) || isAdmin()
                      );
       allow delete: if isAdmin();
@@ -96,6 +100,9 @@ service cloud.firestore {
       allow list: if isValidId(companyId) && (isCompanyOwner() || isAdmin());
 
       function isValidDoc(data) {
+        let tier = getUserData(request.auth.uid).subscriptionTier;
+        let limit = (tier == 'BUSINESS') ? 100 : (tier == 'PRO' ? 10 : 1);
+        
         return data.keys().hasAll(['id', 'title', 'content', 'accessCode', 'companyId', 'createdAt', 'uploaderId']) &&
                data.id == docId &&
                data.title is string && data.title.size() <= 200 &&
@@ -103,7 +110,7 @@ service cloud.firestore {
                data.accessCode is string && data.accessCode.size() <= 256 &&
                data.companyId == companyId &&
                data.uploaderId == request.auth.uid &&
-               data.partnerIds is list && data.partnerIds.size() <= 100 &&
+               data.partnerIds is list && data.partnerIds.size() > 0 && data.partnerIds.size() <= limit &&
                data.createdAt is number &&
                (!('lifespanStart' in data) || data.lifespanStart == null || data.lifespanStart is number) &&
                (!('lastCodeUsedAtOpening' in data) || data.lastCodeUsedAtOpening == null || data.lastCodeUsedAtOpening is string) &&

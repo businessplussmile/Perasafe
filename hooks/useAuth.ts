@@ -44,7 +44,8 @@ export function useAuth() {
               subscriptionStatus: isAdmin ? 'ACTIVE' : 'NONE',
               onboardingCompleted: isAdmin, // Admins bypass onboarding
               name: firebaseUser.displayName || '',
-              createdAt: Date.now()
+              createdAt: Date.now(),
+              subscriptionExpiresAt: Date.now() + 30 * 24 * 60 * 60 * 1000 // 30 days trial
             };
             
             await createUserProfile(newProfile);

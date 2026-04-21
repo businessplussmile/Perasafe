@@ -15,8 +15,18 @@ const SIGNATURE = "PERADOC-SIG-X14";
 const UserDocGrid: React.FC<UserDocGridProps> = ({ documents, onOpenDoc, isAdmin, onDeleteDoc, onImportDocuments }) => {
   const [selectedDoc, setSelectedDoc] = useState<SecureDocument | null>(null);
   const [inputCode, setInputCode] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
   const [error, setError] = useState('');
   const importFileInputRef = useRef<HTMLInputElement>(null);
+
+  const filteredDocuments = React.useMemo(() => {
+    if (!searchQuery.trim()) return documents;
+    const query = searchQuery.toLowerCase().trim();
+    return documents.filter(doc => 
+      doc.title.toLowerCase().includes(query) || 
+      (doc.summary && doc.summary.toLowerCase().includes(query))
+    );
+  }, [documents, searchQuery]);
 
   const handleUnlock = () => {
     if (!selectedDoc) return;
@@ -78,6 +88,19 @@ const UserDocGrid: React.FC<UserDocGridProps> = ({ documents, onOpenDoc, isAdmin
           <p className="text-slate-500 text-sm md:text-lg font-medium leading-relaxed max-w-xl">
             Ces documents sont classés <span className="text-slate-900 font-bold">Secret d'Entreprise</span>. Il est formellement interdit de divulguer, de copier ou de discuter de leur contenu.
           </p>
+
+          <div className="mt-8 relative group max-w-md">
+            <div className="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none">
+              <i className="fas fa-search text-slate-400 group-focus-within:text-indigo-600 transition-colors"></i>
+            </div>
+            <input 
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="RECHERCHER PAR TITRE OU RÉSUMÉ..."
+              className="w-full bg-white border-2 border-slate-100 rounded-2xl py-4 pl-12 pr-6 text-[10px] font-black uppercase tracking-widest text-slate-900 focus:border-indigo-600 outline-none shadow-sm transition-all placeholder:text-slate-300"
+            />
+          </div>
         </div>
         
         <div className="flex flex-col sm:flex-row gap-4 md:gap-8 items-start sm:items-center w-full md:w-auto">
@@ -105,47 +128,59 @@ const UserDocGrid: React.FC<UserDocGridProps> = ({ documents, onOpenDoc, isAdmin
       </div>
 
       <div id="tour-user-vault" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-10">
-        {documents.map(doc => (
-          <div 
-            key={doc.id}
-            className={`group relative rounded-[2rem] md:rounded-[3rem] p-6 md:p-10 transition-all duration-500 border-2 ${
-              doc.isConsumed 
-                ? 'bg-slate-50 border-slate-100 cursor-not-allowed grayscale opacity-50' 
-                : 'bg-white border-white hover:border-indigo-600/30 cursor-pointer shadow-md hover:shadow-xl'
-            }`}
-          >
-            {isAdmin && onDeleteDoc && (
-              <button 
-                onClick={(e) => { e.stopPropagation(); onDeleteDoc(doc.id); }}
-                className="absolute top-4 right-4 md:top-6 md:right-6 w-9 h-9 md:w-10 md:h-10 rounded-xl bg-red-50 text-red-500 sm:opacity-0 group-hover:opacity-100 transition-all hover:bg-red-500 hover:text-white z-10 flex items-center justify-center btn-active"
-              >
-                <i className="fas fa-trash-can text-[10px] md:text-xs"></i>
-              </button>
-            )}
-
+        {filteredDocuments.length === 0 ? (
+          <div className="col-span-full py-20 text-center bg-slate-50 rounded-[3rem] border-2 border-dashed border-slate-200">
+            <i className="fas fa-search text-4xl text-slate-200 mb-6 block"></i>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Aucun document stratégique ne correspond à votre recherche</p>
+          </div>
+        ) : (
+          filteredDocuments.map(doc => (
             <div 
-              onClick={() => !doc.isConsumed && setSelectedDoc(doc)}
-              className="relative h-full"
+              key={doc.id}
+              className={`group relative rounded-[2rem] md:rounded-[3rem] p-6 md:p-10 transition-all duration-500 border-2 ${
+                doc.isConsumed 
+                  ? 'bg-slate-50 border-slate-100 cursor-not-allowed grayscale opacity-50' 
+                  : 'bg-white border-white hover:border-indigo-600/30 cursor-pointer shadow-md hover:shadow-xl'
+              }`}
             >
-              <div className={`w-12 h-12 md:w-16 md:h-16 rounded-2xl md:rounded-[1.5rem] flex items-center justify-center mb-5 md:mb-10 transition-all ${
-                doc.isConsumed ? 'bg-slate-200 text-slate-400' : 'bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white'
-              }`}>
-                <i className={`fas ${doc.isConsumed ? 'fa-vault' : 'fa-box-archive'} text-lg md:text-2xl`}></i>
-              </div>
-              <div className="space-y-1.5 md:space-y-2">
-                <h3 className="text-base md:text-xl font-black text-slate-800 truncate uppercase tracking-tight">{doc.title}</h3>
-                <div className="flex items-center gap-2">
-                  <span 
-                    className="text-[7px] md:text-[8px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full inline-block"
-                    style={!doc.isConsumed ? { backgroundColor: '#F2AF31', color: '#643012' } : { backgroundColor: '#e2e8f0', color: '#64748b' }}
-                  >
-                    {doc.isConsumed ? 'ARCHIVÉ' : 'SECRET D\'ENTREPRISE'}
-                  </span>
+              {isAdmin && onDeleteDoc && (
+                <button 
+                  onClick={(e) => { e.stopPropagation(); onDeleteDoc(doc.id); }}
+                  className="absolute top-4 right-4 md:top-6 md:right-6 w-9 h-9 md:w-10 md:h-10 rounded-xl bg-red-50 text-red-500 sm:opacity-0 group-hover:opacity-100 transition-all hover:bg-red-500 hover:text-white z-10 flex items-center justify-center btn-active"
+                >
+                  <i className="fas fa-trash-can text-[10px] md:text-xs"></i>
+                </button>
+              )}
+
+              <div 
+                onClick={() => !doc.isConsumed && setSelectedDoc(doc)}
+                className="relative h-full"
+              >
+                <div className={`w-12 h-12 md:w-16 md:h-16 rounded-2xl md:rounded-[1.5rem] flex items-center justify-center mb-5 md:mb-10 transition-all ${
+                  doc.isConsumed ? 'bg-slate-200 text-slate-400' : 'bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white'
+                }`}>
+                  <i className={`fas ${doc.isConsumed ? 'fa-vault' : 'fa-box-archive'} text-lg md:text-2xl`}></i>
+                </div>
+                <div className="space-y-1.5 md:space-y-2">
+                  <h3 className="text-base md:text-xl font-black text-slate-800 truncate uppercase tracking-tight">{doc.title}</h3>
+                  <div className="flex items-center gap-2">
+                    <span 
+                      className="text-[7px] md:text-[8px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full inline-block"
+                      style={!doc.isConsumed ? { backgroundColor: '#F2AF31', color: '#643012' } : { backgroundColor: '#e2e8f0', color: '#64748b' }}
+                    >
+                      {doc.isConsumed ? 'ARCHIVÉ' : 'SECRET D\'ENTREPRISE'}
+                    </span>
+                  </div>
+                  {doc.summary && (
+                    <p className="text-[9px] font-medium text-slate-400 line-clamp-2 uppercase tracking-wide leading-relaxed pt-2">
+                      {doc.summary}
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
-          </div>
-        ))}
+          ))
+        )}
       </div>
 
       {selectedDoc && (

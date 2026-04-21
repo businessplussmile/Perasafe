@@ -16,6 +16,7 @@ export interface UserProfile {
   name?: string;
   isBlocked?: boolean;
   createdAt: number;
+  subscriptionExpiresAt?: number;
 }
 
 export interface Company {

@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { SecureDocument, ViewMode, UserProfile } from './types';
+import { PARTNER_LIMITS, DOC_LIMITS, STORAGE_LIMITS } from './constants';
 import AdminPanel from './components/AdminPanel';
 import UserDocGrid from './components/UserDocGrid';
 import SecureViewer from './components/SecureViewer';
@@ -12,6 +13,7 @@ import LandingPage from './components/LandingPage';
 import ProductTour from './components/ProductTour';
 import ProtocolPage from './components/ProtocolPage';
 import PrivacyPolicy from './components/PrivacyPolicy';
+import NotificationBell from './components/NotificationBell';
 import { encryptContent, decryptContent, summarizeDocument } from './services/documentService';
 import { useAuth } from './hooks/useAuth';
 import { db, signOut } from './services/firebaseService';
@@ -151,17 +153,25 @@ const App: React.FC = () => {
   const addDocument = useCallback(async (docData: Omit<SecureDocument, 'id' | 'createdAt' | 'isConsumed' | 'companyId' | 'uploaderId'>) => {
     if (!profile || profile.role !== 'COMPANY_OWNER') return;
 
-    // Vérification de l'abonnement
-    let limit = 5;
-    if (profile.subscriptionTier === 'PRO') limit = 50;
-    if (profile.subscriptionTier === 'BUSINESS') limit = 300;
+    // Vérification de l'abonnement (Nombre de documents)
+    const tier = profile.subscriptionTier || 'STANDARD';
+    const docLimit = DOC_LIMITS[tier];
 
-    if (documents.length >= limit) {
-      alert(`Limite atteinte (${limit} documents). Passez au niveau supérieur pour ajouter plus de fichiers.`);
+    if (documents.length >= docLimit) {
+      alert(`Limite atteinte (${docLimit} document${docLimit > 1 ? 's' : ''}). Passez au niveau supérieur pour ajouter plus de fichiers.`);
       return;
     }
 
     const encryptedContent = encryptContent(docData.content, docData.accessCode);
+    const newDocSize = encryptedContent.length;
+    const currentUsage = documents.reduce((sum, doc) => sum + (doc.content?.length || 0), 0);
+    const storLimit = STORAGE_LIMITS[tier];
+
+    if (currentUsage + newDocSize > storLimit) {
+      alert(`Espace de stockage insuffisant. Supprimez des documents pour libérer de l'espace.`);
+      return;
+    }
+
     const newDocRef = doc(collection(db, 'companies', profile.companyId!, 'documents'));
     
     await setDoc(newDocRef, {
@@ -179,6 +189,17 @@ const App: React.FC = () => {
 
   const onOpenDocRequest = useCallback(async (document: SecureDocument, code: string) => {
     if (!profile) return;
+    
+    // Sécurité supplémentaire : vérifier si l'utilisateur est autorisé
+    const isOwner = profile.role === 'COMPANY_OWNER' && profile.companyId === document.companyId;
+    const isPartner = profile.role === 'PARTNER' && document.partnerIds.includes(profile.email);
+    const isSuperAdmin = profile.role === 'ADMIN';
+
+    if (!isOwner && !isPartner && !isSuperAdmin) {
+      alert("Accès Refusé. Votre identité numérique n'est pas associée à ce pack de données.");
+      return;
+    }
+
     const now = Date.now();
     
     if (document.isConsumed || (document.lifespanStart && now - document.lifespanStart >= LIFESPAN_MS)) {
@@ -236,6 +257,16 @@ const App: React.FC = () => {
     if (activeDoc?.id === docToDelete) switchView('USER');
     setDocToDelete(null);
   }, [docToDelete, activeDoc, switchView, profile]);
+
+  // Calcul du stockage utilisé
+  const storageUsage = useMemo(() => {
+    return documents.reduce((sum, doc) => sum + (doc.content?.length || 0), 0);
+  }, [documents]);
+
+  const storageLimit = useMemo(() => {
+    if (!profile) return 0;
+    return STORAGE_LIMITS[profile.subscriptionTier || 'STANDARD'];
+  }, [profile]);
 
   const upgradeSubscription = useCallback(async (tier: 'PRO' | 'BUSINESS') => {
     if (!profile || profile.role !== 'COMPANY_OWNER') return;
@@ -311,6 +342,8 @@ const App: React.FC = () => {
                 <span className="hidden md:inline">{viewMode === 'ADMIN' ? 'Registre' : 'Espace Entreprise'}</span>
               </button>
             )}
+
+            {user && <NotificationBell profile={profile} />}
 
             {user && (
               <button 
@@ -402,6 +435,9 @@ const App: React.FC = () => {
           {viewMode === 'ADMIN' && profile?.role === 'COMPANY_OWNER' && (
             <MemoizedAdminPanel 
               documents={documents} 
+              profile={profile}
+              storageUsage={storageUsage}
+              storageLimit={storageLimit}
               onAddDocument={addDocument} 
               onImportDocuments={() => {}} 
               onUpdateCode={updateDocCode} 
@@ -451,7 +487,9 @@ const App: React.FC = () => {
                   <div className="text-xl font-black text-slate-800 mt-1">500<span className="text-[10px] text-slate-400 ml-1">FCFA/mois</span></div>
                 </div>
                 <ul className="space-y-2 mb-6 flex-1">
-                  <li className="text-[9px] font-bold text-slate-500 flex items-center gap-2"><CheckCircle2 className="w-3 h-3 text-indigo-500" /> 5 Documents/mois</li>
+                  <li className="text-[9px] font-bold text-slate-500 flex items-center gap-2"><CheckCircle2 className="w-3 h-3 text-indigo-500" /> {DOC_LIMITS.STANDARD} Document/mois</li>
+                  <li className="text-[9px] font-bold text-slate-500 flex items-center gap-2"><CheckCircle2 className="w-3 h-3 text-indigo-500" /> {PARTNER_LIMITS.STANDARD} Partenaire/doc</li>
+                  <li className="text-[9px] font-bold text-slate-500 flex items-center gap-2"><CheckCircle2 className="w-3 h-3 text-indigo-500" /> 2 MB Stockage</li>
                   <li className="text-[9px] font-bold text-slate-500 flex items-center gap-2"><CheckCircle2 className="w-3 h-3 text-indigo-500" /> Support Mail</li>
                 </ul>
                 <button disabled className="w-full bg-slate-200 text-slate-400 font-black py-3 rounded-2xl text-[9px] uppercase tracking-widest">
@@ -468,6 +506,9 @@ const App: React.FC = () => {
                 </div>
                 <ul className="space-y-2 mb-6 flex-1">
                   <li className="text-[9px] font-bold text-slate-500 flex items-center gap-2"><CheckCircle2 className="w-3 h-3 text-indigo-500" /> 50 Documents/mois</li>
+                  <li className="text-[9px] font-bold text-slate-500 flex items-center gap-2"><CheckCircle2 className="w-3 h-3 text-indigo-500" /> {PARTNER_LIMITS.PRO} Partenaires/doc</li>
+                  <li className="text-[9px] font-bold text-slate-500 flex items-center gap-2"><CheckCircle2 className="w-3 h-3 text-indigo-500" /> 50 MB Stockage</li>
+                  <li className="text-[9px] font-bold text-slate-500 flex items-center gap-2"><CheckCircle2 className="w-3 h-3 text-indigo-500" /> Images optimisées</li>
                   <li className="text-[9px] font-bold text-slate-500 flex items-center gap-2"><CheckCircle2 className="w-3 h-3 text-indigo-500" /> IA Illimitée</li>
                 </ul>
                 <button 
@@ -488,6 +529,9 @@ const App: React.FC = () => {
                 </div>
                 <ul className="space-y-2 mb-6 flex-1">
                   <li className="text-[9px] font-bold text-slate-500 flex items-center gap-2"><CheckCircle2 className="w-3 h-3 text-indigo-500" /> 300 Documents/mois</li>
+                  <li className="text-[9px] font-bold text-slate-500 flex items-center gap-2"><CheckCircle2 className="w-3 h-3 text-indigo-500" /> Partenaires illimités</li>
+                  <li className="text-[9px] font-bold text-slate-500 flex items-center gap-2"><CheckCircle2 className="w-3 h-3 text-indigo-500" /> 500 MB Stockage</li>
+                  <li className="text-[9px] font-bold text-slate-500 flex items-center gap-2"><CheckCircle2 className="w-3 h-3 text-indigo-500" /> Images (165 Ko max)</li>
                   <li className="text-[9px] font-bold text-slate-500 flex items-center gap-2"><CheckCircle2 className="w-3 h-3 text-indigo-500" /> Multi-utilisateurs</li>
                 </ul>
                 <button 

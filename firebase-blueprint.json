@@ -10,9 +10,14 @@
         "role": { "type": "string", "enum": ["ADMIN", "COMPANY_OWNER", "PARTNER"] },
         "companyId": { "type": "string", "description": "Associated company ID for owners" },
         "name": { "type": "string", "description": "Display name (max 100 chars)" },
+        "subscriptionTier": { "type": "string", "enum": ["STANDARD", "PRO", "BUSINESS"] },
+        "subscriptionStatus": { "type": "string", "enum": ["NONE", "PENDING", "ACTIVE"] },
+        "subscriptionExpiresAt": { "type": "number", "description": "Expiration timestamp in ms" },
+        "onboardingCompleted": { "type": "boolean" },
+        "isBlocked": { "type": "boolean" },
         "createdAt": { "type": "number", "description": "Server timestamp in ms" }
       },
-      "required": ["uid", "email", "role", "createdAt"]
+      "required": ["uid", "email", "role", "createdAt", "subscriptionTier"]
     },
     "Company": {
       "title": "Company",

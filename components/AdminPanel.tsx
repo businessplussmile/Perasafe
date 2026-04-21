@@ -1,11 +1,16 @@
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { SecureDocument } from '../types';
+import { SecureDocument, UserProfile } from '../types';
+import { PARTNER_LIMITS } from '../constants';
 import { summarizeDocument } from '../services/documentService';
-import { Sparkles, Loader2 } from 'lucide-react';
+import { Sparkles, Loader2, Users, Image as ImageIcon } from 'lucide-react';
+import imageCompression from 'browser-image-compression';
 
 interface AdminPanelProps {
   documents: SecureDocument[];
+  profile: UserProfile | null;
+  storageUsage: number;
+  storageLimit: number;
   onAddDocument: (doc: Omit<SecureDocument, 'id' | 'createdAt' | 'isConsumed' | 'companyId' | 'uploaderId'>) => void;
   onImportDocuments: (docs: SecureDocument[]) => void;
   onUpdateCode: (id: string, newCode: string) => Promise<boolean>;
@@ -42,7 +47,7 @@ const COLORS = [
   { label: 'Vert', value: '#16a34a' }
 ];
 
-const AdminPanel: React.FC<AdminPanelProps> = ({ documents, onAddDocument, onImportDocuments, onUpdateCode, onToggleStatus, onDeleteDocument }) => {
+const AdminPanel: React.FC<AdminPanelProps> = ({ documents, profile, storageUsage, storageLimit, onAddDocument, onImportDocuments, onUpdateCode, onToggleStatus, onDeleteDocument }) => {
   const [title, setTitle] = useState('');
   const [code, setCode] = useState('');
   const [isFullScreen, setIsFullScreen] = useState(false);
@@ -50,6 +55,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ documents, onAddDocument, onImp
   const [activeFont, setActiveFont] = useState(FONTS[0].value);
   const [showInstructions, setShowInstructions] = useState(true);
   const [isSummarizing, setIsSummarizing] = useState(false);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [docSummary, setDocSummary] = useState('');
   const [validityDuration, setValidityDuration] = useState(86400000); // Default: 24h in ms
   
@@ -151,6 +157,16 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ documents, onAddDocument, onImp
 
   const [partnerEmails, setPartnerEmails] = useState('');
   
+  const formatBytes = (bytes: number) => {
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+  };
+
+  const storagePercentage = Math.min(100, (storageUsage / storageLimit) * 100);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const content = editorRef.current?.innerHTML || '';
@@ -158,10 +174,68 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ documents, onAddDocument, onImp
       showToast("Veuillez remplir tous les champs.", 'error');
       return;
     }
+    
     const partnerIds = partnerEmails.split(',').map(email => email.trim()).filter(email => email !== '');
+    
+    if (partnerIds.length === 0) {
+      showToast("Veuillez inviter au moins un partenaire.", 'error');
+      return;
+    }
+    
+    // Check partner limits based on subscription
+    const tier = profile?.subscriptionTier || 'STANDARD';
+    const limit = PARTNER_LIMITS[tier];
+    
+    if (partnerIds.length > limit) {
+      showToast(`Votre forfait ${tier} limite les partenaires à ${limit} par document.`, 'error');
+      return;
+    }
+
     onAddDocument({ title, content, mimeType: 'text/html', accessCode: code, partnerIds, summary: docSummary, validityDuration });
     showToast("Document ajouté avec succès.");
     resetForm();
+  };
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !profile) return;
+
+    if (profile.subscriptionTier === 'STANDARD') {
+      showToast("L'ajout d'images est réservé aux abonnements PRO et BUSINESS.", 'error');
+      return;
+    }
+
+    setIsUploadingImage(true);
+    try {
+      const options = {
+        maxSizeMB: 0.165, // Limit to 165 KB as requested
+        maxWidthOrHeight: 1280,
+        useWebWorker: true,
+        initialQuality: 0.7
+      };
+      
+      const compressedFile = await imageCompression(file, options);
+      const base64 = await imageCompression.getDataUrlFromFile(compressedFile);
+      
+      if (editorRef.current) {
+        editorRef.current.focus();
+        document.execCommand('insertHTML', false, `
+          <div style="margin: 2rem 0; text-align: center;">
+            <img src="${base64}" style="width: 100%; max-width: 600px; border-radius: 1.5rem; display: block; margin: 0 auto; box-shadow: 0 10px 30px -10px rgba(0,0,0,0.1);" />
+            <p style="font-size: 10px; color: #94a3b8; margin-top: 8px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.1em;">Image Chiffrée & Optimisée</p>
+          </div>
+          <p><br /></p>
+        `);
+      }
+      
+      showToast('Média optimisé (165 Ko max).', 'success');
+    } catch (error) {
+      console.error(error);
+      showToast("Erreur lors de l'optimisation média.", 'error');
+    } finally {
+      setIsUploadingImage(false);
+      e.target.value = '';
+    }
   };
 
   const generateSummary = async () => {
@@ -206,6 +280,31 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ documents, onAddDocument, onImp
   return (
     <div className={`max-w-6xl mx-auto px-4 py-6 md:py-12 space-y-8 animate-fade-in pb-40 ${isFullScreen ? 'overflow-hidden' : ''}`}>
       
+      {/* Barre de stockage */}
+      <div className="bg-white rounded-3xl p-6 border border-slate-100 shadow-sm flex flex-col md:flex-row items-center justify-between gap-6">
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center">
+            <i className="fas fa-database text-xl"></i>
+          </div>
+          <div>
+            <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Espace de Stockage</h4>
+            <div className="text-sm font-black text-slate-900">{formatBytes(storageUsage)} / {formatBytes(storageLimit)}</div>
+          </div>
+        </div>
+        <div className="flex-1 w-full max-w-md">
+          <div className="flex justify-between text-[8px] font-black uppercase tracking-widest text-slate-400 mb-2">
+            <span>Utilisation</span>
+            <span>{Math.round(storagePercentage)}%</span>
+          </div>
+          <div className="h-3 bg-slate-100 rounded-full overflow-hidden shadow-inner">
+            <div 
+              className={`h-full transition-all duration-1000 ${storagePercentage > 90 ? 'bg-red-500' : 'bg-indigo-600'}`}
+              style={{ width: `${storagePercentage}%` }}
+            ></div>
+          </div>
+        </div>
+      </div>
+
       {toast && (
         <div className={`fixed top-24 left-1/2 -translate-x-1/2 z-[300] px-6 py-3 rounded-2xl shadow-2xl font-black text-[10px] uppercase tracking-widest animate-fade-in border flex items-center gap-3 ${toast.type === 'success' ? 'bg-white border-green-100 text-green-600' : 'bg-white border-red-100 text-red-600'}`}>
           <i className={`fas ${toast.type === 'success' ? 'fa-circle-check' : 'fa-circle-exclamation'}`}></i>
@@ -258,8 +357,8 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ documents, onAddDocument, onImp
                   <p className="text-[11px] opacity-80 leading-relaxed font-medium">Après la 1ère lecture, le document est accessible pendant 24h avant révocation automatique.</p>
                 </div>
                 <div className="space-y-1">
-                  <span className="text-[9px] font-black text-[#F2AF31] uppercase tracking-widest block">03. Confidentialité</span>
-                  <p className="text-[11px] opacity-80 leading-relaxed font-medium">Protection anti-capture active : le contenu se floute si vous perdez le focus de la fenêtre.</p>
+                  <span className="text-[9px] font-black text-[#F2AF31] uppercase tracking-widest block">03. Accès Sélectif</span>
+                  <p className="text-[11px] opacity-80 leading-relaxed font-medium">L'invitation par email est obligatoire. Sans cela, l'accès est bloqué même avec le bon code.</p>
                 </div>
               </div>
             </div>
@@ -306,14 +405,20 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ documents, onAddDocument, onImp
             </div>
             <div id="tour-admin-settings" className="w-full md:w-auto shrink-0 flex flex-col md:flex-row gap-4">
               <div>
-                <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Partenaires (emails séparés par virgule)</label>
-                <input 
-                  type="text" 
-                  value={partnerEmails}
-                  onChange={(e) => setPartnerEmails(e.target.value)}
-                  className="bg-white border-2 border-slate-100 rounded-xl p-4 text-slate-600 font-bold w-full md:w-[300px] outline-none shadow-inner focus:border-indigo-600"
-                  placeholder="partenaire@email.com, ..."
-                />
+                <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1 flex justify-between">
+                  <span>Partenaires (Obligatoire)</span>
+                  <span className="text-indigo-600">Limite: {PARTNER_LIMITS[profile?.subscriptionTier || 'STANDARD']}</span>
+                </label>
+                <div className="relative">
+                  <input 
+                    type="text" 
+                    value={partnerEmails}
+                    onChange={(e) => setPartnerEmails(e.target.value)}
+                    className="bg-white border-2 border-slate-100 rounded-xl p-4 pr-12 text-slate-600 font-bold w-full md:w-[300px] outline-none shadow-inner focus:border-indigo-600"
+                    placeholder="email1@partenaire.com, email2@..."
+                  />
+                  <Users className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300" />
+                </div>
               </div>
               <div>
                 <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Durée de validité (après ouverture)</label>
@@ -390,20 +495,15 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ documents, onAddDocument, onImp
             </div>
 
             <div className="flex items-center gap-1.5 ml-auto">
-              <input type="file" ref={fileInputRef} onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) {
-                  const reader = new FileReader();
-                  reader.onload = (event) => {
-                    const base64 = event.target?.result as string;
-                    document.execCommand('insertHTML', false, `<img src="${base64}" style="width: 100%; max-width: 600px; border-radius: 1.5rem; margin: 2rem auto; display: block;" />`);
-                  };
-                  reader.readAsDataURL(file);
-                }
-              }} accept="image/*" className="hidden" />
-              <button type="button" onClick={() => fileInputRef.current?.click()} className="bg-[#643012] text-[#F2AF31] px-3 py-1.5 rounded-lg text-[8px] font-black uppercase tracking-widest hover:brightness-110 transition-all flex items-center gap-2">
-                <i className="fas fa-image text-[9px]"></i>
-                <span className="hidden lg:inline">Média</span>
+              <input type="file" ref={fileInputRef} onChange={handleImageUpload} accept="image/*" className="hidden" />
+              <button 
+                type="button" 
+                onClick={() => fileInputRef.current?.click()} 
+                className={`bg-[#643012] text-[#F2AF31] px-3 py-1.5 rounded-lg text-[8px] font-black uppercase tracking-widest hover:brightness-110 transition-all flex items-center gap-2 ${profile?.subscriptionTier === 'STANDARD' ? 'opacity-50 grayscale' : ''}`}
+                disabled={isUploadingImage}
+              >
+                {isUploadingImage ? <Loader2 className="w-3 h-3 animate-spin"/> : <ImageIcon className="w-3 h-3" />}
+                <span className="hidden lg:inline">{isUploadingImage ? 'Compression...' : 'Média'}</span>
               </button>
               <button type="button" onClick={() => setIsFullScreen(!isFullScreen)} className="w-8 h-8 text-slate-300 hover:text-[#643012] transition-colors"><i className={`fas ${isFullScreen ? 'fa-compress' : 'fa-expand'} text-[10px]`}></i></button>
             </div>

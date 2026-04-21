@@ -50,6 +50,18 @@ const SuperAdminPanel: React.FC = () => {
   const pendingUsers = useMemo(() => allUsers.filter(u => u.subscriptionStatus === 'PENDING'), [allUsers]);
   const activeUsers = useMemo(() => allUsers.filter(u => u.subscriptionStatus !== 'PENDING'), [allUsers]);
 
+  const setExpirationDate = async (user: UserProfile, days: number) => {
+    try {
+      const userRef = doc(db, 'users', user.uid);
+      const newExpiry = Date.now() + days * 24 * 60 * 60 * 1000;
+      await updateDoc(userRef, { subscriptionExpiresAt: newExpiry });
+      alert(`Expiration mise à jour : +${days} jours.`);
+    } catch (error) {
+      console.error("Set expiry error:", error);
+      alert("Erreur lors de la mise à jour de l'expiration.");
+    }
+  };
+
   const handleDecision = async (user: UserProfile, approved: boolean) => {
     try {
       const userRef = doc(db, 'users', user.uid);
@@ -270,6 +282,7 @@ const SuperAdminPanel: React.FC = () => {
                 <tr className="bg-slate-50">
                   <th className="px-8 py-4 text-[9px] font-black text-slate-400 uppercase tracking-widest min-w-[200px]">Utilisateur</th>
                   <th className="px-8 py-4 text-[9px] font-black text-slate-400 uppercase tracking-widest">Type / Forfait</th>
+                  <th className="px-8 py-4 text-[9px] font-black text-slate-400 uppercase tracking-widest">Échéance</th>
                   <th className="px-8 py-4 text-[9px] font-black text-slate-400 uppercase tracking-widest text-center">Stats</th>
                   <th className="px-8 py-4 text-[9px] font-black text-slate-400 uppercase tracking-widest text-right">Contrôle Tactique</th>
                 </tr>
@@ -314,6 +327,18 @@ const SuperAdminPanel: React.FC = () => {
                           <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase self-start ${(u.subscriptionTier === 'PRO' || u.subscriptionTier === 'BUSINESS') ? 'bg-indigo-50 text-indigo-600' : 'bg-green-50 text-green-600'}`}>
                             {u.subscriptionTier || 'STANDARD'}
                           </span>
+                        </div>
+                      </td>
+                      <td className="px-8 py-6">
+                        <div className="flex flex-col gap-1">
+                          <span className="text-[10px] font-bold text-slate-600 uppercase tracking-tight">
+                            {u.subscriptionExpiresAt ? new Date(u.subscriptionExpiresAt).toLocaleDateString('fr-FR') : 'Non définie'}
+                          </span>
+                          <div className="flex gap-1 mt-1">
+                             <button onClick={() => setExpirationDate(u, 10)} className="text-[8px] font-black text-indigo-600 uppercase border border-indigo-100 px-1.5 py-0.5 rounded-md hover:bg-indigo-50">+10j</button>
+                             <button onClick={() => setExpirationDate(u, 30)} className="text-[8px] font-black text-indigo-600 uppercase border border-indigo-100 px-1.5 py-0.5 rounded-md hover:bg-indigo-50">+30j</button>
+                             <button onClick={() => setExpirationDate(u, -1)} className="text-[8px] font-black text-red-600 uppercase border border-red-100 px-1.5 py-0.5 rounded-md hover:bg-red-50">Expirer</button>
+                          </div>
                         </div>
                       </td>
                       <td className="px-8 py-6 text-center">
