@@ -4,6 +4,7 @@ import { motion } from 'motion/react';
 import { ShieldCheck, Zap, Lock, Users, Sparkles, ChevronRight, Play, CheckCircle2, ArrowRight } from 'lucide-react';
 import ParallaxSecuritySpace from './ParallaxSecuritySpace';
 import DemoPresentation from './DemoPresentation';
+import InterfaceWalkthrough from './InterfaceWalkthrough';
 
 interface LandingPageProps {
   onStart: () => void;
@@ -209,6 +210,8 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStart, onLogin, onViewProto
           </div>
         </div>
       </section>
+
+      <InterfaceWalkthrough />
 
       {/* Steps Section */}
       <section className="py-24 bg-slate-900 text-white">
