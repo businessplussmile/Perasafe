@@ -13,7 +13,9 @@ import {
   Sparkles,
   Key,
   Eye,
-  CheckCircle2
+  CheckCircle2,
+  Volume2,
+  VolumeX
 } from 'lucide-react';
 
 const LogoIcon = () => (
@@ -204,20 +206,55 @@ interface DemoPresentationProps {
 
 const DemoPresentation: React.FC<DemoPresentationProps> = ({ isOpen, onClose, onFinalStart }) => {
   const [currentSlide, setCurrentSlide] = useState(0);
+  const [isMuted, setIsMuted] = useState(false);
+  const [hasInteracted, setHasInteracted] = useState(false);
+  const audioRef = React.useRef<HTMLAudioElement>(null);
+
+  // Force play on first interaction within the demo
+  const handleUserInteraction = () => {
+    if (!hasInteracted && audioRef.current) {
+      audioRef.current.play().catch(e => console.log("Still blocked:", e));
+      setHasInteracted(true);
+    }
+  };
 
   const next = () => {
+    handleUserInteraction();
     if (currentSlide < slides.length - 1) {
       setCurrentSlide(prev => prev + 1);
     } else {
+      if (audioRef.current) {
+        audioRef.current.pause();
+      }
       onFinalStart();
     }
   };
 
   const prev = () => {
+    handleUserInteraction();
     if (currentSlide > 0) {
       setCurrentSlide(prev => prev - 1);
     }
   };
+
+  useEffect(() => {
+    if (isOpen && audioRef.current) {
+      audioRef.current.volume = 0.3;
+      // Try to play immediately, but it might fail
+      const playPromise = audioRef.current.play();
+      if (playPromise !== undefined) {
+        playPromise.catch(() => {
+          console.log("Autoplay blocked - waiting for user interaction");
+        });
+      }
+    }
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.currentTime = 0;
+      }
+    };
+  }, [isOpen]);
 
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
@@ -244,13 +281,35 @@ const DemoPresentation: React.FC<DemoPresentationProps> = ({ isOpen, onClose, on
             />
           ))}
         </div>
-        <button onClick={onClose} className="w-10 h-10 rounded-full hover:bg-slate-200 flex items-center justify-center text-slate-400 transition-colors">
-          <X size={20} />
-        </button>
+        
+        <div className="flex flex-col gap-2">
+          <button 
+            onClick={() => setIsMuted(!isMuted)} 
+            className="w-10 h-10 rounded-full hover:bg-slate-200 flex items-center justify-center text-slate-400 transition-colors"
+            title={isMuted ? "Activer le son" : "Couper le son"}
+          >
+            {isMuted ? <VolumeX size={18} /> : <Volume2 size={18} />}
+          </button>
+          
+          <button onClick={onClose} className="w-10 h-10 rounded-full hover:bg-slate-200 flex items-center justify-center text-slate-400 transition-colors" title="Fermer la démo">
+            <X size={20} />
+          </button>
+        </div>
       </div>
 
+      <audio 
+        ref={audioRef}
+        src="https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3"
+        loop
+        preload="auto"
+        muted={isMuted}
+      />
+
       {/* Main Content Area */}
-      <div className="flex-1 relative flex flex-col overflow-hidden">
+      <div 
+        onClick={handleUserInteraction}
+        className="flex-1 relative flex flex-col overflow-hidden cursor-default"
+      >
         {/* Mobile Header */}
         <div className="md:hidden p-6 flex justify-between items-center">
           <LogoIcon />
