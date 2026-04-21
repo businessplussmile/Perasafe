@@ -1,8 +1,9 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { motion } from 'motion/react';
 import { ShieldCheck, Zap, Lock, Users, Sparkles, ChevronRight, Play, CheckCircle2, ArrowRight } from 'lucide-react';
 import ParallaxSecuritySpace from './ParallaxSecuritySpace';
+import DemoPresentation from './DemoPresentation';
 
 interface LandingPageProps {
   onStart: () => void;
@@ -12,8 +13,18 @@ interface LandingPageProps {
 }
 
 const LandingPage: React.FC<LandingPageProps> = ({ onStart, onLogin, onViewProtocol, onViewPrivacy }) => {
+  const [isDemoOpen, setIsDemoOpen] = useState(false);
+
   return (
     <div className="relative min-h-screen bg-white font-sans text-slate-900 overflow-x-hidden">
+      <DemoPresentation 
+        isOpen={isDemoOpen} 
+        onClose={() => setIsDemoOpen(false)} 
+        onFinalStart={() => {
+          setIsDemoOpen(false);
+          onStart();
+        }}
+      />
       {/* Header */}
       <header className="fixed top-0 left-0 right-0 z-[100] bg-white/80 backdrop-blur-xl border-b border-slate-100 h-20 flex items-center px-6 md:px-12">
         <div className="max-w-7xl mx-auto w-full flex justify-between items-center">
@@ -87,7 +98,10 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStart, onLogin, onViewProto
               >
                 Commencer gratuitement <ChevronRight className="w-4 h-4" />
               </button>
-              <button className="w-full sm:w-auto px-8 py-4 rounded-2xl text-base font-black uppercase tracking-widest text-slate-600 hover:bg-slate-50 transition-all flex items-center justify-center gap-3">
+              <button 
+                onClick={() => setIsDemoOpen(true)}
+                className="w-full sm:w-auto px-8 py-4 rounded-2xl text-base font-black uppercase tracking-widest text-slate-600 hover:bg-slate-50 transition-all flex items-center justify-center gap-3 group"
+              >
                 <div className="w-8 h-8 bg-slate-100 rounded-full flex items-center justify-center group-hover:bg-indigo-100 transition-colors">
                   <Play className="w-3.5 h-3.5 text-indigo-600 fill-indigo-600" />
                 </div>
