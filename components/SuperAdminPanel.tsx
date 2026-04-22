@@ -210,6 +210,62 @@ const SuperAdminPanel: React.FC = () => {
     });
   };
 
+  const executeFactoryReset = async () => {
+    setPurging('ALL');
+    try {
+      const usersQuery = collection(db, 'users');
+      const usersSnap = await getDocs(usersQuery);
+      const batch = writeBatch(db);
+      let opCount = 0;
+
+      // Ensure we don't exceed Firestore 500 operation limit per batch,
+      // but for this simple app, we can just use promises for documents to be safe and simple.
+      const commitPromises = [];
+
+      for (const u of usersSnap.docs) {
+        if (u.data().email === 'jorisahoussi4@gmail.com') {
+          continue; // Skip the super admin
+        }
+
+        const uid = u.id;
+        const companyId = u.data().companyId;
+
+        if (companyId) {
+          // Fetch and delete documents in company
+          const docsQuery = collection(db, 'companies', companyId, 'documents');
+          const docsSnap = await getDocs(docsQuery);
+          for (const d of docsSnap.docs) {
+            commitPromises.push(deleteDoc(d.ref));
+          }
+          // Delete company
+          commitPromises.push(deleteDoc(doc(db, 'companies', companyId)));
+        }
+
+        // Delete user
+        commitPromises.push(deleteDoc(u.ref));
+      }
+
+      await Promise.all(commitPromises);
+      showToast("Réinitialisation de la base de données réussie.");
+    } catch (error) {
+      console.error("Factory reset error:", error);
+      showToast("Erreur lors de la réinitialisation.", "error");
+    } finally {
+      setPurging(null);
+      closeConfirm();
+    }
+  };
+
+  const factoryResetSystem = () => {
+    requestConfirm({
+      title: "RÉINITIALISATION D'URGENCE (FACTORY RESET)",
+      message: `ATTENTION: Vous êtes sur le point d'effacer tous les utilisateurs, entreprises et documents de la base (sauf le super administrateur). C'EST IRRÉVERSIBLE. Tapez 'RESET' n'est pas requis, mais confirmez votre choix conscient.`,
+      isDestructive: true,
+      confirmText: 'EFFACER TOUT',
+      onConfirm: () => executeFactoryReset()
+    });
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center p-20">
@@ -353,10 +409,18 @@ const SuperAdminPanel: React.FC = () => {
 
         {/* Active Accounts Directory */}
         <div className="bg-white rounded-[2.5rem] shadow-xl border border-slate-100 overflow-hidden mt-8">
-          <div className="p-8 border-b border-slate-50 flex justify-between items-center text-center xs:text-left">
+          <div className="p-8 border-b border-slate-50 flex justify-between items-center text-center xs:text-left flex-wrap gap-4">
             <h2 className="text-sm font-black text-slate-900 uppercase tracking-widest flex items-center gap-3">
               <UsersIcon className="w-4 h-4 text-indigo-500" /> Annuaire des Comptes Actifs ({activeUsers.length})
             </h2>
+            <button 
+              onClick={factoryResetSystem}
+              disabled={purging === 'ALL'}
+              className="px-6 py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-black uppercase tracking-widest shadow-lg shadow-red-600/20 transition-all disabled:opacity-50 flex items-center gap-2"
+            >
+              <AlertTriangle className="w-4 h-4" /> 
+              {purging === 'ALL' ? "PURGE EN COURS..." : "RÉINITIALISER TOUT LE SYSTÈME"}
+            </button>
           </div>
 
           <div className="overflow-x-auto">

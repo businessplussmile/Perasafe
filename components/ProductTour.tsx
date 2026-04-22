@@ -76,7 +76,6 @@ const CustomTooltip = ({
 
 const ProductTour: React.FC<ProductTourProps> = ({ role, userId, viewMode, hasSeenAdminTour, hasSeenUserTour, onTourComplete }) => {
   const [run, setRun] = useState(false);
-  const [stepIndex, setStepIndex] = useState(0);
 
   useEffect(() => {
     // Determine which tour key to use based on viewMode
@@ -96,7 +95,6 @@ const ProductTour: React.FC<ProductTourProps> = ({ role, userId, viewMode, hasSe
           (role === 'PARTNER' && viewMode === 'USER') || 
           (role === 'COMPANY_OWNER' && viewMode === 'USER')) {
         timeoutId = setTimeout(() => {
-          setStepIndex(0);
           setRun(true);
         }, 1500); 
       }
@@ -110,7 +108,7 @@ const ProductTour: React.FC<ProductTourProps> = ({ role, userId, viewMode, hasSe
   }, [userId, role, viewMode, hasSeenAdminTour, hasSeenUserTour]);
 
   const handleJoyrideCallback = (data: any) => {
-    const { status, action, index, type } = data;
+    const { status, action } = data;
     const finishedStatuses: string[] = [STATUS.FINISHED, STATUS.SKIPPED];
 
     // Added action === 'close' to handle clicking the "Passer" or X button definitively
@@ -124,9 +122,6 @@ const ProductTour: React.FC<ProductTourProps> = ({ role, userId, viewMode, hasSe
       
       // Update database for persistence
       onTourComplete(tourType);
-    } else if (type === 'step:after' || type === 'target:notFound') {
-      // Manage step progression manually for stability
-      setStepIndex(index + (action === 'prev' ? -1 : 1));
     }
   };
 
@@ -204,7 +199,6 @@ const ProductTour: React.FC<ProductTourProps> = ({ role, userId, viewMode, hasSe
     <JoyrideComponent
       steps={steps}
       run={run}
-      stepIndex={stepIndex}
       continuous={true}
       scrollToFirstStep={true}
       callback={handleJoyrideCallback}
