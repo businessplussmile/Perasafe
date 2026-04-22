@@ -492,7 +492,10 @@ const App: React.FC = () => {
   }
 
   if (viewMode === 'ONBOARDING' && profile) {
-    return <OnboardingFlow profile={profile} onComplete={() => {}} onReturnToLanding={async () => {
+    return <OnboardingFlow 
+      profile={profile} 
+      onComplete={() => setViewMode(profile.role === 'COMPANY_OWNER' ? 'ADMIN' : 'USER')} 
+      onReturnToLanding={async () => {
       try {
         await signOut();
         setViewMode('LANDING');

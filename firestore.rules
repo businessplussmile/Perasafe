@@ -52,7 +52,7 @@ service cloud.firestore {
                data.role in ['ADMIN', 'COMPANY_OWNER', 'PARTNER'] &&
                data.createdAt is number &&
                (!('isBlocked' in data) || data.isBlocked is bool) &&
-               (!('subscriptionTier' in data) || data.subscriptionTier in ['STANDARD', 'PRO', 'BUSINESS']) &&
+               (!('subscriptionTier' in data) || data.subscriptionTier in ['FREE', 'STANDARD', 'PRO', 'BUSINESS']) &&
                (!('subscriptionStatus' in data) || data.subscriptionStatus in ['NONE', 'PENDING', 'ACTIVE']) &&
                (!('subscriptionExpiresAt' in data) || data.subscriptionExpiresAt is number) &&
                (!('hasSeenAdminTour' in data) || data.hasSeenAdminTour is bool) &&
