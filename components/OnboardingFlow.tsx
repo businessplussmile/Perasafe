@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { UserProfile } from '../types';
 import { db } from '../services/firebaseService';
 import { doc, updateDoc, deleteDoc } from 'firebase/firestore';
-import { CheckCircle2, Building, Phone, Briefcase, ChevronRight, ShieldCheck, Clock, User } from 'lucide-react';
+import { CheckCircle2, Building, Phone, Briefcase, ChevronRight, ShieldCheck, Clock, User, LogOut } from 'lucide-react';
 
 interface OnboardingFlowProps {
   profile: UserProfile;
@@ -234,6 +234,15 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ profile, onComplete, on
                     <User className="w-5 h-5 text-indigo-600 transition-colors" />
                     Je suis invité à lire un document protégé
                   </button>
+
+                  {onReturnToLanding && (
+                    <button 
+                      onClick={onReturnToLanding}
+                      className="mt-4 text-[10px] font-black text-slate-400 hover:text-red-500 uppercase tracking-[0.2em] transition-all flex items-center gap-2"
+                    >
+                      <LogOut className="w-3 h-3" /> Revenir en arrière
+                    </button>
+                  )}
                 </div>
               </motion.div>
             )}
