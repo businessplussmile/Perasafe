@@ -509,7 +509,7 @@ const App: React.FC = () => {
                   <li className="text-[9px] font-bold text-slate-500 flex items-center gap-2"><CheckCircle2 className="w-3 h-3 text-indigo-500" /> {PARTNER_LIMITS.PRO} Partenaires/doc</li>
                   <li className="text-[9px] font-bold text-slate-500 flex items-center gap-2"><CheckCircle2 className="w-3 h-3 text-indigo-500" /> 50 MB Stockage</li>
                   <li className="text-[9px] font-bold text-slate-500 flex items-center gap-2"><CheckCircle2 className="w-3 h-3 text-indigo-500" /> Images optimisées</li>
-                  <li className="text-[9px] font-bold text-slate-500 flex items-center gap-2"><CheckCircle2 className="w-3 h-3 text-indigo-500" /> IA Illimitée</li>
+                  <li className="text-[9px] font-bold text-slate-500 flex items-center gap-2"><CheckCircle2 className="w-3 h-3 text-indigo-500" /> Assistance Automatisée</li>
                 </ul>
                 <button 
                   onClick={() => upgradeSubscription('PRO')}

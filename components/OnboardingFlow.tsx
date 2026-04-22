@@ -2,8 +2,8 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { UserProfile } from '../types';
 import { db } from '../services/firebaseService';
-import { doc, updateDoc } from 'firebase/firestore';
-import { CheckCircle2, Building, Phone, Briefcase, ChevronRight, ShieldCheck, Clock } from 'lucide-react';
+import { doc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { CheckCircle2, Building, Phone, Briefcase, ChevronRight, ShieldCheck, Clock, User } from 'lucide-react';
 
 interface OnboardingFlowProps {
   profile: UserProfile;
@@ -53,6 +53,29 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ profile, onComplete, on
       </div>
     );
   }
+
+  const handlePartnerAccess = async () => {
+    setIsSubmitting(true);
+    try {
+      const userRef = doc(db, 'users', profile.uid);
+      await updateDoc(userRef, {
+        role: 'PARTNER',
+        subscriptionStatus: 'ACTIVE',
+        subscriptionTier: 'STANDARD', 
+        onboardingCompleted: true
+      });
+      // Cleanup the auto-created company doc to keep the db clean
+      if (profile.companyId) {
+        await deleteDoc(doc(db, 'companies', profile.companyId));
+      }
+      if (onComplete) onComplete();
+    } catch (error) {
+       console.error("Partner setup error:", error);
+       alert("Erreur de configuration du compte partenaire.");
+    } finally {
+       setIsSubmitting(false);
+    }
+  };
 
   const handleNext = () => {
     setStep(2);
@@ -150,7 +173,7 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ profile, onComplete, on
                     </div>
                     <ul className="space-y-3 mb-8 flex-1">
                       <li className="text-xs font-bold text-slate-600 flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-indigo-500" /> 50 documents stratégiques</li>
-                      <li className="text-xs font-bold text-slate-600 flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-indigo-500" /> Assistance IA Illimitée</li>
+                      <li className="text-xs font-bold text-slate-600 flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-indigo-500" /> Assistance Automatisée Illimitée</li>
                     </ul>
                   </div>
 
@@ -161,9 +184,9 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ profile, onComplete, on
                   >
                     {selectedTier === 'BUSINESS' && <div className="absolute top-4 right-4 w-6 h-6 bg-indigo-600 text-white rounded-full flex items-center justify-center"><CheckCircle2 className="w-4 h-4" /></div>}
                     <div className="mb-4 mt-2">
-                      <span className="text-[10px] font-black text-indigo-600 uppercase tracking-widest">Enterprise</span>
-                      <h3 className="text-2xl font-black uppercase tracking-tighter mb-1 mt-1">Business</h3>
-                      <div className="text-3xl font-black text-slate-900 mb-6">5500<span className="text-[10px] font-bold text-slate-400 ml-1 uppercase">FCFA/mois</span></div>
+                       <span className="text-[10px] font-black text-indigo-600 uppercase tracking-widest">Enterprise</span>
+                       <h3 className="text-2xl font-black uppercase tracking-tighter mb-1 mt-1">Business</h3>
+                       <div className="text-3xl font-black text-slate-900 mb-6">5500<span className="text-[10px] font-bold text-slate-400 ml-1 uppercase">FCFA/mois</span></div>
                     </div>
                     <ul className="space-y-3 mb-8 flex-1">
                       <li className="text-xs font-bold text-slate-600 flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-indigo-500" /> 300 documents stratégiques</li>
@@ -172,12 +195,27 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ profile, onComplete, on
                   </div>
                 </div>
 
-                <div className="mt-12 flex justify-center">
+                <div className="mt-12 flex flex-col items-center gap-6">
                   <button 
                     onClick={handleNext}
                     className="bg-indigo-600 text-white px-10 py-5 rounded-2xl text-sm font-black uppercase tracking-widest shadow-xl shadow-indigo-600/20 hover:scale-105 transition-all flex items-center gap-3"
                   >
                     Continuer <ChevronRight className="w-4 h-4" />
+                  </button>
+
+                  <div className="w-full max-w-sm flex items-center gap-4 my-2 opacity-50">
+                    <div className="flex-1 h-[1px] bg-slate-300"></div>
+                    <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">OU</span>
+                    <div className="flex-1 h-[1px] bg-slate-300"></div>
+                  </div>
+
+                  <button 
+                    onClick={handlePartnerAccess}
+                    disabled={isSubmitting}
+                    className="group bg-white border border-slate-200 hover:border-indigo-600 hover:shadow-xl hover:shadow-indigo-600/10 text-slate-700 px-8 py-5 rounded-2xl text-xs font-black uppercase tracking-widest transition-all flex items-center gap-3 disabled:opacity-50"
+                  >
+                    <User className="w-5 h-5 text-indigo-600 transition-colors" />
+                    Je suis invité à lire un document protégé
                   </button>
                 </div>
               </motion.div>
@@ -249,7 +287,7 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ profile, onComplete, on
                        disabled={isSubmitting}
                        className="flex-1 bg-indigo-600 text-white px-6 py-4 rounded-2xl text-xs font-black uppercase tracking-widest shadow-xl shadow-indigo-600/20 hover:scale-[1.02] transition-all disabled:opacity-50 disabled:hover:scale-100"
                      >
-                       {isSubmitting ? 'Transmission...' : 'Soumettre la demande'}
+                       {isSubmitting ? 'Transmission...' : 'Soumettre'}
                      </button>
                    </div>
                 </form>

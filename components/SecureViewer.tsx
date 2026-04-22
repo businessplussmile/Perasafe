@@ -3,7 +3,8 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { SecureDocument } from '../types';
 import { useSecurity } from '../hooks/useSecurity';
 import { decryptContent } from '../services/documentService';
-import { Sparkles } from 'lucide-react';
+import { Sparkles, Camera, AlertTriangle } from 'lucide-react';
+import { useCameraLeakDetection } from '../hooks/useCameraLeakDetection';
 
 interface SecureViewerProps {
   document: SecureDocument;
@@ -31,6 +32,9 @@ const SecureViewer: React.FC<SecureViewerProps> = ({ document: doc, onExit, isAd
   const [isBlurred, setIsBlurred] = useState(false);
   const [loadingProgress, setLoadingProgress] = useState(0);
   const [isReading, setIsReading] = useState(true);
+
+  // Initialiser la détection de fuite (anti-téléphone)
+  const { cameraEnabled, leakDetected } = useCameraLeakDetection(doc.id, doc.uploaderId, "Partenaire");
 
   // Le hook de sécurité pilote l'état de floutage
   useSecurity(true, (triggered) => {
@@ -164,23 +168,36 @@ const SecureViewer: React.FC<SecureViewerProps> = ({ document: doc, onExit, isAd
 
       <main className="flex-1 overflow-y-auto p-0 md:p-0 relative custom-scrollbar bg-slate-200/50 backdrop-blur-sm">
         {/* Overlay de Sécurité Actif */}
-        {isBlurred && (
+        {(isBlurred || leakDetected) && (
           <div className="fixed inset-0 z-[200] bg-white/60 backdrop-blur-[40px] flex flex-col items-center justify-center text-center p-8 animate-fade-in">
-            <div className="w-20 h-20 bg-red-600 text-white rounded-[2rem] flex items-center justify-center mb-8 shadow-2xl animate-pulse">
-              <i className="fas fa-eye-slash text-3xl"></i>
+            <div className={`w-20 h-20 ${leakDetected ? 'bg-orange-600' : 'bg-red-600'} text-white rounded-[2rem] flex items-center justify-center mb-8 shadow-2xl animate-pulse`}>
+              {leakDetected ? <Camera className="w-8 h-8" /> : <i className="fas fa-eye-slash text-3xl"></i>}
             </div>
-            <h2 className="text-2xl md:text-4xl font-black text-slate-900 uppercase tracking-tighter">Confidentialité Suspendue</h2>
-            <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest mt-4 mb-10">Capture d'écran ou perte de focus détectée</p>
-            <button 
-              onClick={() => setIsBlurred(false)} 
-              className="px-12 py-5 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl btn-active"
-            >
-              Reprendre la lecture sécurisée
-            </button>
+            <h2 className="text-2xl md:text-4xl font-black text-slate-900 uppercase tracking-tighter">
+              {leakDetected ? "ALERTE DE TENTATIVE DE FUITE" : "Confidentialité Suspendue"}
+            </h2>
+            <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest mt-4 mb-4">
+              {leakDetected ? "Un téléphone ou une caméra a été détecté devant l'écran." : "Capture d'écran ou perte de focus détectée"}
+            </p>
+            {leakDetected ? (
+               <div className="bg-orange-100/50 border border-orange-200 text-orange-800 p-4 rounded-xl text-xs max-w-sm font-semibold mb-10 flex items-start gap-4 text-left">
+                  <AlertTriangle className="w-5 h-5 shrink-0 mt-0.5 text-orange-600" />
+                  <div>
+                    Par mesure de sécurité, l'accès à ce document a été verrouillé. Un signal vient d'être transmis au propriétaire du document ainsi qu'à l'équipe d'administration (jorisahoussi4@gmail.com).
+                  </div>
+               </div>
+            ) : (
+               <button 
+                 onClick={() => setIsBlurred(false)} 
+                 className="px-12 py-5 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl btn-active mb-10"
+               >
+                 Reprendre la lecture sécurisée
+               </button>
+            )}
           </div>
         )}
 
-        <div className={`w-full relative transition-all duration-500 ${isBlurred ? 'filter blur-[50px] scale-105 pointer-events-none' : 'filter blur-0 scale-100'}`}>
+        <div className={`w-full relative transition-all duration-500 ${(isBlurred || leakDetected) ? 'filter blur-[50px] scale-105 pointer-events-none' : 'filter blur-0 scale-100'}`}>
           <div className="relative bg-white min-h-screen shadow-2xl p-0 flex flex-col relative overflow-hidden">
              
              <div className="h-4 md:h-6 bg-[#643012] w-full"></div>
@@ -211,7 +228,7 @@ const SecureViewer: React.FC<SecureViewerProps> = ({ document: doc, onExit, isAd
                            <Sparkles className="w-5 h-5" />
                         </div>
                         <div className="space-y-1">
-                           <span className="text-[9px] font-black text-indigo-600 uppercase tracking-widest block mb-1">Analyse Stratégique IA</span>
+                           <span className="text-[9px] font-black text-indigo-600 uppercase tracking-widest block mb-1">Analyse Stratégique Automatisée</span>
                            <p className="text-[13px] text-slate-700 leading-relaxed font-medium italic">"{doc.summary}"</p>
                         </div>
                      </div>

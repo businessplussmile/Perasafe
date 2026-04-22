@@ -18,25 +18,31 @@ service cloud.firestore {
     function getUserData(uid) {
       return get(/databases/$(database)/documents/users/$(uid)).data;
     }
+    
     function isAdmin() {
       // Direct email check for the app owner and role check for scalability
-      return isVerified() && (request.auth.token.email == 'jorisahoussi4@gmail.com' || getUserData(request.auth.uid).role == 'ADMIN');
+      return isSignedIn() && (
+        request.auth.token.email == 'jorisahoussi4@gmail.com' || 
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'ADMIN')
+      );
     }
 
     function isNotBlocked() {
-       return !('isBlocked' in getUserData(request.auth.uid)) || getUserData(request.auth.uid).isBlocked == false;
+       return exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+              (!('isBlocked' in get(/databases/$(database)/documents/users/$(request.auth.uid)).data) || 
+               get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isBlocked == false);
     }
     
     function canAccess() {
-       return isVerified() && isNotBlocked();
+       return isSignedIn() && isNotBlocked();
     }
 
     // --- PHASE 4: Entity Match Blocks ---
 
     // 1. Users Collection
     match /users/{userId} {
-      allow get: if isVerified() && (request.auth.uid == userId || isAdmin());
-      allow list: if isVerified() && isAdmin();
+      allow get: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      allow list: if isSignedIn() && isAdmin();
       
       function isValidUser(data) {
         return data.keys().hasAll(['uid', 'email', 'role', 'createdAt']) &&
@@ -52,16 +58,16 @@ service cloud.firestore {
                (!('onboardingCompleted' in data) || data.onboardingCompleted is bool);
       }
 
-      allow create: if isVerified() && isValidId(userId) && userId == request.auth.uid && isValidUser(incoming());
-      allow update: if isVerified() && (
+      allow create: if isSignedIn() && isValidId(userId) && userId == request.auth.uid && isValidUser(incoming());
+      allow update: if isSignedIn() && (
                        (request.auth.uid == userId && isNotBlocked() &&
                         incoming().uid == existing().uid &&
                         incoming().email == existing().email &&
-                        incoming().role == existing().role && // Immutable role for self
+                        (incoming().role == existing().role || (existing().role == 'COMPANY_OWNER' && incoming().role == 'PARTNER')) && 
                         !('isBlocked' in incoming()) && 
-                        incoming().diff(existing()).affectedKeys().hasOnly(['name', 'companyId', 'subscriptionStatus', 'requestedTier', 'onboardingData', 'onboardingCompleted', 'subscriptionTier', 'subscriptionExpiresAt']) &&
+                        incoming().diff(existing()).affectedKeys().hasOnly(['name', 'companyId', 'subscriptionStatus', 'requestedTier', 'onboardingData', 'onboardingCompleted', 'subscriptionTier', 'subscriptionExpiresAt', 'role']) &&
                         // Logic guards for self-updates
-                        (incoming().subscriptionStatus in ['NONE', 'PENDING'] || isAdmin())
+                        (incoming().subscriptionStatus in ['NONE', 'PENDING'] || (incoming().role == 'PARTNER' && incoming().subscriptionStatus == 'ACTIVE') || isAdmin())
                        ) || isAdmin()
                      );
       allow delete: if isAdmin();
@@ -83,7 +89,7 @@ service cloud.firestore {
       allow update: if (canAccess() || isAdmin()) && (existing().ownerId == request.auth.uid || isAdmin()) && 
                        incoming().id == existing().id &&
                        incoming().diff(existing()).affectedKeys().hasOnly(['name', 'subscriptionStatus', 'subscriptionTier', 'subscriptionExpiry']);
-      allow delete: if isAdmin();
+      allow delete: if isAdmin() || (canAccess() && existing().ownerId == request.auth.uid);
     }
 
     // 3. Documents Sub-collection

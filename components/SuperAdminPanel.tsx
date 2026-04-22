@@ -2,13 +2,35 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { db } from '../services/firebaseService';
 import { collection, query, onSnapshot, doc, updateDoc, getDocs, deleteDoc, writeBatch } from 'firebase/firestore';
 import { UserProfile } from '../types';
-import { CheckCircle, XCircle, Clock, User, Mail, Shield, Users as UsersIcon, Ban, Trash2, Calendar, RefreshCcw } from 'lucide-react';
+import { CheckCircle, XCircle, Clock, User, Mail, Shield, Users as UsersIcon, Ban, Trash2, Calendar, RefreshCcw, AlertTriangle } from 'lucide-react';
+
+interface ConfirmDialogState {
+  isOpen: boolean;
+  title: string;
+  message: string;
+  onConfirm: () => void;
+  confirmText?: string;
+  isDestructive?: boolean;
+}
 
 const SuperAdminPanel: React.FC = () => {
   const [allUsers, setAllUsers] = useState<UserProfile[]>([]);
   const [partnerCounts, setPartnerCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [purging, setPurging] = useState<string | null>(null);
+  const [toastMessage, setToastMessage] = useState<{message: string, type: 'success'|'error'} | null>(null);
+  const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState>({ isOpen: false, title: '', message: '', onConfirm: () => {} });
+
+  const showToast = (message: string, type: 'success'|'error' = 'success') => {
+    setToastMessage({message, type});
+    setTimeout(() => setToastMessage(null), 4000);
+  };
+
+  const closeConfirm = () => setConfirmDialog(prev => ({ ...prev, isOpen: false }));
+
+  const requestConfirm = (props: Omit<ConfirmDialogState, 'isOpen'>) => {
+    setConfirmDialog({ ...props, isOpen: true });
+  };
 
   useEffect(() => {
     const q = query(collection(db, 'users'));
@@ -55,10 +77,10 @@ const SuperAdminPanel: React.FC = () => {
       const userRef = doc(db, 'users', user.uid);
       const newExpiry = Date.now() + days * 24 * 60 * 60 * 1000;
       await updateDoc(userRef, { subscriptionExpiresAt: newExpiry });
-      alert(`Expiration mise à jour : +${days} jours.`);
+      showToast(`Expiration mise à jour : +${days} jours.`);
     } catch (error) {
       console.error("Set expiry error:", error);
-      alert("Erreur lors de la mise à jour de l'expiration.");
+      showToast("Erreur lors de la mise à jour de l'expiration.", "error");
     }
   };
 
@@ -80,57 +102,70 @@ const SuperAdminPanel: React.FC = () => {
             subscriptionTier: tier
           });
         }
-        alert("Abonnement validé.");
+        showToast("Abonnement validé.");
       } else {
         await updateDoc(userRef, {
           subscriptionStatus: 'NONE',
           onboardingCompleted: false
         });
-        alert("Demande rejetée.");
+        showToast("Demande rejetée.");
       }
     } catch (error) {
       console.error("Decision error:", error);
-      alert("Erreur lors de la validation.");
+      showToast("Erreur lors de la validation.", "error");
     }
   };
 
-  const toggleBlockUser = async (user: UserProfile) => {
+  const executeToggleBlock = async (user: UserProfile) => {
     const newStatus = !user.isBlocked;
-    if (!confirm(`Voulez-vous ${newStatus ? 'BLOQUER' : 'DÉBLOQUER'} cet utilisateur ?`)) return;
-
     try {
       const userRef = doc(db, 'users', user.uid);
       await updateDoc(userRef, { isBlocked: newStatus });
-      alert(`Utilisateur ${newStatus ? 'bloqué' : 'débloqué'}.`);
+      showToast(`Utilisateur ${newStatus ? 'bloqué' : 'débloqué'}.`);
     } catch (error) {
       console.error("Block error:", error);
-      alert("Erreur lors de la modification du statut.");
+      showToast("Erreur lors de la modification du statut.", "error");
     }
+    closeConfirm();
   };
 
-  const deleteAccount = async (user: UserProfile) => {
-    if (!confirm(`ATTENTION: Voulez-vous SUPPRIMER DÉFINITIVEMENT le compte de ${user.email} ? Cette action est irréversible.`)) return;
-    
+  const toggleBlockUser = (user: UserProfile) => {
+    const newStatus = !user.isBlocked;
+    requestConfirm({
+      title: `${newStatus ? 'Bloquer' : 'Débloquer'} l'utilisateur`,
+      message: `Êtes-vous sûr de vouloir ${newStatus ? 'bloquer' : 'débloquer'} l'accès de ${user.email} ?`,
+      isDestructive: newStatus,
+      confirmText: newStatus ? 'Bloquer' : 'Débloquer',
+      onConfirm: () => executeToggleBlock(user)
+    });
+  };
+
+  const executeDeleteAccount = async (user: UserProfile) => {
     try {
-      // Delete user doc
       await deleteDoc(doc(db, 'users', user.uid));
-      
-      // Delete company doc if exists
       if (user.companyId) {
         await deleteDoc(doc(db, 'companies', user.companyId));
       }
-      
-      alert("Compte supprimé.");
+      showToast("Compte supprimé définitivement.");
     } catch (error) {
       console.error("Delete account error:", error);
-      alert("Erreur lors de la suppression.");
+      showToast("Erreur lors de la suppression.", "error");
     }
+    closeConfirm();
   };
 
-  const purgeDocuments = async (user: UserProfile, olderThanDays: number) => {
-    if (!user.companyId) return;
-    if (!confirm(`Voulez-vous supprimer les documents de ${user.email} datant de PLUS de ${olderThanDays} jours ?`)) return;
+  const deleteAccount = (user: UserProfile) => {
+    requestConfirm({
+      title: "Suppression Définitive",
+      message: `ATTENTION: Voulez-vous SUPPRIMER DÉFINITIVEMENT le compte de ${user.email} ? Cette action est irréversible et supprimera toutes les ressources associées.`,
+      isDestructive: true,
+      confirmText: 'Supprimer Définitivement',
+      onConfirm: () => executeDeleteAccount(user)
+    });
+  };
 
+  const executePurge = async (user: UserProfile, olderThanDays: number) => {
+    if (!user.companyId) return;
     setPurging(user.uid);
     try {
       const now = Date.now();
@@ -152,16 +187,27 @@ const SuperAdminPanel: React.FC = () => {
 
       if (count > 0) {
         await batch.commit();
-        alert(`${count} documents anciens supprimés.`);
+        showToast(`${count} documents anciens supprimés.`);
       } else {
-        alert("Aucun document correspondant trouvé.");
+        showToast("Aucun document correspondant trouvé.");
       }
     } catch (error) {
       console.error("Purge error:", error);
-      alert("Erreur lors de la purge.");
+      showToast("Erreur lors de la purge.", "error");
     } finally {
       setPurging(null);
+      closeConfirm();
     }
+  };
+
+  const purgeDocuments = (user: UserProfile, olderThanDays: number) => {
+    requestConfirm({
+      title: "Purger les documents anciens",
+      message: `Voulez-vous supprimer DÉFINITIVEMENT tous les documents de ${user.email} créés il y a plus de ${olderThanDays} jours ?`,
+      isDestructive: true,
+      confirmText: 'Purger',
+      onConfirm: () => executePurge(user, olderThanDays)
+    });
   };
 
   if (loading) {
@@ -173,7 +219,44 @@ const SuperAdminPanel: React.FC = () => {
   }
 
   return (
-    <div className="p-4 md:p-10 max-w-7xl mx-auto animate-fade-in">
+    <div className="p-4 md:p-10 max-w-7xl mx-auto animate-fade-in relative">
+      {/* Toast Notification */}
+      {toastMessage && (
+        <div className={`fixed top-6 left-1/2 -translate-x-1/2 z-[100] px-6 py-3 rounded-full shadow-2xl flex items-center gap-3 animate-fade-in ${toastMessage.type === 'error' ? 'bg-red-600 text-white' : 'bg-slate-900 text-white'}`}>
+          {toastMessage.type === 'error' ? <XCircle className="w-5 h-5" /> : <CheckCircle className="w-5 h-5 text-green-400" />}
+          <span className="text-xs font-bold">{toastMessage.message}</span>
+        </div>
+      )}
+
+      {/* Confirmation Modal */}
+      {confirmDialog.isOpen && (
+        <div className="fixed inset-0 z-[200] bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl text-center">
+            <div className={`w-16 h-16 ${confirmDialog.isDestructive ? 'bg-red-100 text-red-600' : 'bg-indigo-100 text-indigo-600'} rounded-2xl flex items-center justify-center mx-auto mb-6`}>
+              {confirmDialog.isDestructive ? <AlertTriangle className="w-8 h-8" /> : <Shield className="w-8 h-8" />}
+            </div>
+            <h3 className="text-xl font-black text-slate-900 tracking-tight mb-2">{confirmDialog.title}</h3>
+            <p className="text-sm text-slate-500 mb-8 leading-relaxed">
+              {confirmDialog.message}
+            </p>
+            <div className="flex gap-4">
+              <button 
+                onClick={closeConfirm}
+                className="flex-1 px-4 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-black uppercase tracking-widest transition-colors"
+              >
+                Annuler
+              </button>
+              <button 
+                onClick={confirmDialog.onConfirm}
+                className={`flex-1 px-4 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-colors text-white shadow-lg ${confirmDialog.isDestructive ? 'bg-red-600 hover:bg-red-700 shadow-red-600/20' : 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-600/20'}`}
+              >
+                {confirmDialog.confirmText || 'Confirmer'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="flex items-center gap-4 mb-10">
         <div className="w-12 h-12 bg-indigo-600 rounded-2xl flex items-center justify-center text-white shadow-xl">
           <Shield className="w-6 h-6" />
