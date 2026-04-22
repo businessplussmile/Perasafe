@@ -213,12 +213,22 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ profile, onComplete, on
                 </div>
 
                 <div className="mt-12 flex flex-col items-center gap-6">
-                  <button 
-                    onClick={handleNext}
-                    className="bg-indigo-600 text-white px-10 py-5 rounded-2xl text-sm font-black uppercase tracking-widest shadow-xl shadow-indigo-600/20 hover:scale-105 transition-all flex items-center gap-3"
-                  >
-                    Continuer <ChevronRight className="w-4 h-4" />
-                  </button>
+                  <div className="flex flex-col sm:flex-row items-center gap-4">
+                    {onReturnToLanding && (
+                      <button 
+                        onClick={onReturnToLanding}
+                        className="px-10 py-5 rounded-2xl text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-slate-600 transition-all"
+                      >
+                        Annuler / Retour
+                      </button>
+                    )}
+                    <button 
+                      onClick={handleNext}
+                      className="bg-indigo-600 text-white px-10 py-5 rounded-2xl text-sm font-black uppercase tracking-widest shadow-xl shadow-indigo-600/20 hover:scale-105 transition-all flex items-center gap-3"
+                    >
+                      Continuer <ChevronRight className="w-4 h-4" />
+                    </button>
+                  </div>
 
                   <div className="w-full max-w-sm flex items-center gap-4 my-2 opacity-50">
                     <div className="flex-1 h-[1px] bg-slate-300"></div>
@@ -291,22 +301,22 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ profile, onComplete, on
                      />
                    </div>
 
-                   <div className="mt-4 flex items-center gap-4">
-                     <button 
-                       type="button"
-                       onClick={handleBack}
-                       className="px-6 py-4 rounded-xl text-xs font-black uppercase tracking-widest text-slate-400 hover:bg-slate-50 transition-colors"
-                     >
-                       Retour
-                     </button>
-                     <button 
-                       type="submit"
-                       disabled={isSubmitting}
-                       className="flex-1 bg-indigo-600 text-white px-6 py-4 rounded-2xl text-xs font-black uppercase tracking-widest shadow-xl shadow-indigo-600/20 hover:scale-[1.02] transition-all disabled:opacity-50 disabled:hover:scale-100"
-                     >
-                       {isSubmitting ? 'Transmission...' : 'Soumettre'}
-                     </button>
-                   </div>
+                    <div className="mt-4 flex items-center gap-4">
+                      <button 
+                        type="button"
+                        onClick={handleBack}
+                        className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-500 px-6 py-4 rounded-2xl text-xs font-black uppercase tracking-widest transition-all"
+                      >
+                        Retour aux forfaits
+                      </button>
+                      <button 
+                        type="submit"
+                        disabled={isSubmitting}
+                        className="flex-1 bg-indigo-600 text-white px-6 py-4 rounded-2xl text-xs font-black uppercase tracking-widest shadow-xl shadow-indigo-600/20 hover:scale-[1.02] transition-all disabled:opacity-50 disabled:hover:scale-100"
+                      >
+                        {isSubmitting ? 'Transmission...' : 'Soumettre'}
+                      </button>
+                    </div>
                 </form>
               </motion.div>
             )}
