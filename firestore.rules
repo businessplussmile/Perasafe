@@ -127,15 +127,23 @@ service cloud.firestore {
       
       allow update: if (isCompanyOwner() || isPartner() || isAdmin()) && 
                        isValidId(companyId) && isValidId(docId) &&
-                       (isAdmin() || (isValidDoc(incoming()) &&
-                        incoming().id == existing().id &&
-                        incoming().companyId == existing().companyId &&
-                        incoming().createdAt == existing().createdAt)) && (
-                         // Owner can update everything
-                         (isCompanyOwner() && incoming().diff(existing()).affectedKeys().hasOnly(['title', 'content', 'accessCode', 'isConsumed', 'partnerIds', 'lifespanStart', 'lastCodeUsedAtOpening', 'validityDuration'])) ||
-                         // Partner can only update 'lifespanStart' and 'lastCodeUsedAtOpening' when opening for the first time
-                         (isPartner() && incoming().diff(existing()).affectedKeys().hasOnly(['lifespanStart', 'lastCodeUsedAtOpening'])) ||
-                         isAdmin()
+                       (
+                         isAdmin() || 
+                         // Partner can only update 'lifespanStart' and 'lastCodeUsedAtOpening'
+                         (isPartner() && 
+                          incoming().diff(existing()).affectedKeys().hasOnly(['lifespanStart', 'lastCodeUsedAtOpening']) &&
+                          (!('lifespanStart' in incoming()) || incoming().lifespanStart == null || incoming().lifespanStart is number) &&
+                          (!('lastCodeUsedAtOpening' in incoming()) || incoming().lastCodeUsedAtOpening == null || incoming().lastCodeUsedAtOpening is string)
+                         ) ||
+                         // Owner update requires full validation
+                         (isCompanyOwner() && 
+                          isValidDoc(incoming()) &&
+                          incoming().id == existing().id &&
+                          incoming().companyId == existing().companyId &&
+                          incoming().createdAt == existing().createdAt &&
+                          incoming().uploaderId == existing().uploaderId &&
+                          incoming().diff(existing()).affectedKeys().hasOnly(['title', 'content', 'accessCode', 'isConsumed', 'partnerIds', 'lifespanStart', 'lastCodeUsedAtOpening', 'validityDuration'])
+                         )
                        );
 
       allow delete: if (isValidId(companyId) && isCompanyOwner()) || isAdmin();
