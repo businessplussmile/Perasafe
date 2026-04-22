@@ -152,12 +152,68 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ documents, profile, storageUsag
       statsTimeoutRef.current = window.setTimeout(updateStats, 500);
     };
 
+    const handlePaste = (e: ClipboardEvent) => {
+      const isRestricted = profile?.subscriptionTier === 'FREE' || profile?.subscriptionTier === 'STANDARD' || !profile?.subscriptionTier;
+      if (!isRestricted) return;
+
+      const items = e.clipboardData?.items;
+      const html = e.clipboardData?.getData('text/html');
+
+      // 1. Check binary items (screenshots, copied files)
+      if (items) {
+        for (let i = 0; i < items.length; i++) {
+          if (items[i].type.indexOf('image') !== -1) {
+            e.preventDefault();
+            showToast("Le copier-coller d'images est réservé aux abonnements PRO et BUSINESS.", 'error');
+            return;
+          }
+        }
+      }
+
+      // 2. Check HTML content (images from web pages)
+      if (html && html.toLowerCase().includes('<img')) {
+        e.preventDefault();
+        showToast("L'insertion d'images via HTML est réservée aux abonnements PRO et BUSINESS.", 'error');
+        return;
+      }
+    };
+
+    const handleDrop = (e: DragEvent) => {
+      const isRestricted = profile?.subscriptionTier === 'FREE' || profile?.subscriptionTier === 'STANDARD' || !profile?.subscriptionTier;
+      if (!isRestricted) return;
+
+      const files = e.dataTransfer?.files;
+      const html = e.dataTransfer?.getData('text/html');
+
+      // 1. Check binary files
+      if (files) {
+        for (let i = 0; i < files.length; i++) {
+          if (files[i].type.startsWith('image/')) {
+            e.preventDefault();
+            showToast("Le glisser-déposer d'images est réservé aux abonnements PRO et BUSINESS.", 'error');
+            return;
+          }
+        }
+      }
+
+      // 2. Check HTML drop (images from other tabs)
+      if (html && html.toLowerCase().includes('<img')) {
+        e.preventDefault();
+        showToast("Le transfert d'images est réservé aux abonnements PRO et BUSINESS.", 'error');
+        return;
+      }
+    };
+
     editor.addEventListener('input', handleInput);
+    editor.addEventListener('paste', handlePaste);
+    editor.addEventListener('drop', handleDrop);
     return () => {
       editor.removeEventListener('input', handleInput);
+      editor.removeEventListener('paste', handlePaste);
+      editor.removeEventListener('drop', handleDrop);
       if (statsTimeoutRef.current) window.clearTimeout(statsTimeoutRef.current);
     };
-  }, [updateStats]);
+  }, [updateStats, profile]);
 
   const [partnerEmails, setPartnerEmails] = useState('');
   
