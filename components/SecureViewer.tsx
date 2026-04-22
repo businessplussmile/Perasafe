@@ -180,11 +180,19 @@ const SecureViewer: React.FC<SecureViewerProps> = ({ document: doc, onExit, isAd
               {leakDetected ? "Un téléphone ou une caméra a été détecté devant l'écran." : "Capture d'écran ou perte de focus détectée"}
             </p>
             {leakDetected ? (
-               <div className="bg-orange-100/50 border border-orange-200 text-orange-800 p-4 rounded-xl text-xs max-w-sm font-semibold mb-10 flex items-start gap-4 text-left">
-                  <AlertTriangle className="w-5 h-5 shrink-0 mt-0.5 text-orange-600" />
-                  <div>
-                    Par mesure de sécurité, l'accès à ce document a été verrouillé. Un signal vient d'être transmis au propriétaire du document ainsi qu'à l'équipe d'administration (jorisahoussi4@gmail.com).
-                  </div>
+               <div className="flex flex-col items-center gap-6">
+                 <div className="bg-orange-100/50 border border-orange-200 text-orange-800 p-4 rounded-xl text-xs max-w-sm font-semibold mb-2 flex items-start gap-4 text-left">
+                    <AlertTriangle className="w-5 h-5 shrink-0 mt-0.5 text-orange-600" />
+                    <div>
+                      Par mesure de sécurité, l'accès à ce document a été verrouillé. Un signal vient d'être transmis au propriétaire du document ainsi qu'à l'équipe d'administration (jorisahoussi4@gmail.com).
+                    </div>
+                 </div>
+                 <button 
+                   onClick={onExit} 
+                   className="px-12 py-5 bg-orange-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl shadow-orange-600/20 btn-active mb-10 hover:bg-orange-700"
+                 >
+                   Quitter la vue sécurisée
+                 </button>
                </div>
             ) : (
                <button 
@@ -197,7 +205,7 @@ const SecureViewer: React.FC<SecureViewerProps> = ({ document: doc, onExit, isAd
           </div>
         )}
 
-        <div className={`w-full relative transition-all duration-500 ${(isBlurred || leakDetected) ? 'filter blur-[50px] scale-105 pointer-events-none' : 'filter blur-0 scale-100'}`}>
+        <div className={`w-full relative transition-all duration-500 ${isBlurred ? 'filter blur-[50px] scale-105 pointer-events-none' : leakDetected ? 'opacity-0 scale-95 pointer-events-none' : 'filter blur-0 scale-100 opacity-100'}`}>
           <div className="relative bg-white min-h-screen shadow-2xl p-0 flex flex-col relative overflow-hidden">
              
              <div className="h-4 md:h-6 bg-[#643012] w-full"></div>
@@ -238,7 +246,7 @@ const SecureViewer: React.FC<SecureViewerProps> = ({ document: doc, onExit, isAd
                 </div>
 
                 <div className="text-[#1e293b] font-serif text-lg md:text-[24px] leading-[2] select-none rich-text-viewer py-12"
-                   dangerouslySetInnerHTML={{ __html: decryptedBody }}
+                   dangerouslySetInnerHTML={{ __html: leakDetected ? '' : decryptedBody }}
                 />
              </div>
 

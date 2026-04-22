@@ -104,7 +104,7 @@ export const useCameraLeakDetection = (documentId: string, ownerEmail: string, r
       }
     };
 
-    detectionIntervalRef.current = window.setInterval(detect, 1000); // Check every second
+    detectionIntervalRef.current = window.setInterval(detect, 200); // Check 5 times per second
     
     return () => {
       if (detectionIntervalRef.current) {
