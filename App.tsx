@@ -84,20 +84,9 @@ const App: React.FC = () => {
         return;
       }
       
-      // Auto-route to correct interface from public screens based on role
+      // Auto-route to USER (Intelligence Stratégique) interface from public screens
       if (viewMode === 'LANDING' || viewMode === 'LOGIN') {
-        const params = new URLSearchParams(window.location.search);
-        if (params.get('import') === 'true') {
-          setViewMode('USER');
-        } else {
-          if (profile.role === 'COMPANY_OWNER') {
-            setViewMode('ADMIN');
-          } else if (profile.role === 'ADMIN') {
-            setViewMode('SUBSCRIPTION');
-          } else {
-            setViewMode('USER');
-          }
-        }
+        setViewMode('USER');
       }
     }
   }, [user, profile, viewMode]);
@@ -513,6 +502,7 @@ const App: React.FC = () => {
       {/* Product Tour Overlay */}
       {profile && (viewMode === 'ADMIN' || viewMode === 'USER') && (
         <ProductTour 
+          key={`tour-${viewMode}`}
           role={profile.role === 'COMPANY_OWNER' ? 'COMPANY_OWNER' : 'PARTNER'} 
           userId={profile.uid} 
           viewMode={viewMode}
