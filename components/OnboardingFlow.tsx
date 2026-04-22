@@ -153,7 +153,7 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ profile, onComplete, on
                       <div className="text-3xl font-black text-slate-900 mb-6">0<span className="text-[10px] font-bold text-slate-400 ml-1 uppercase">FCFA</span></div>
                     </div>
                     <ul className="space-y-3 mb-8 flex-1">
-                      <li className="text-xs font-bold text-slate-600 flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-indigo-500" /> 1 document stratégique</li>
+                      <li className="text-xs font-bold text-slate-600 flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-indigo-500" /> 1 document (10 pages max)</li>
                       <li className="text-xs font-bold text-slate-600 flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-indigo-500" /> 1 partenaire max</li>
                     </ul>
                   </div>

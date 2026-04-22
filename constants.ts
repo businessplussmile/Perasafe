@@ -14,7 +14,7 @@ export const DOC_LIMITS = {
 } as const;
 
 export const STORAGE_LIMITS = {
-  FREE: 1 * 1024 * 1024,       // 1 MB
+  FREE: 0.05 * 1024 * 1024,    // 0.05 MB (Approx. 10 pages of text)
   STANDARD: 2 * 1024 * 1024,   // 2 MB
   PRO: 50 * 1024 * 1024,       // 50 MB
   BUSINESS: 500 * 1024 * 1024, // 500 MB
