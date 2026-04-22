@@ -16,6 +16,7 @@ interface AdminPanelProps {
   onUpdateCode: (id: string, newCode: string) => Promise<boolean>;
   onToggleStatus: (id: string) => void;
   onDeleteDocument: (id: string) => void;
+  onUpgrade?: () => void;
 }
 
 const SIGNATURE = "PERADOC-SIG-X14";
@@ -47,7 +48,7 @@ const COLORS = [
   { label: 'Vert', value: '#16a34a' }
 ];
 
-const AdminPanel: React.FC<AdminPanelProps> = ({ documents, profile, storageUsage, storageLimit, onAddDocument, onImportDocuments, onUpdateCode, onToggleStatus, onDeleteDocument }) => {
+const AdminPanel: React.FC<AdminPanelProps> = ({ documents, profile, storageUsage, storageLimit, onAddDocument, onImportDocuments, onUpdateCode, onToggleStatus, onDeleteDocument, onUpgrade }) => {
   const [title, setTitle] = useState('');
   const [code, setCode] = useState('');
   const [isFullScreen, setIsFullScreen] = useState(false);
@@ -164,7 +165,12 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ documents, profile, storageUsag
         for (let i = 0; i < items.length; i++) {
           if (items[i].type.indexOf('image') !== -1) {
             e.preventDefault();
-            showToast("Le copier-coller d'images est réservé aux abonnements PRO et BUSINESS.", 'error');
+            const msg = "Le copier-coller d'images est réservé aux abonnements PRO et BUSINESS. Cliquez ici pour améliorer votre offre.";
+            showToast(msg, 'error');
+            if (onUpgrade) {
+              // Optionnel: on peut aussi rediriger direct au clic sur le toast si on avait un toast custom
+              // Ici on va juste utiliser le toast existant pour informer
+            }
             return;
           }
         }
@@ -173,7 +179,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ documents, profile, storageUsag
       // 2. Check HTML content (images from web pages)
       if (html && html.toLowerCase().includes('<img')) {
         e.preventDefault();
-        showToast("L'insertion d'images via HTML est réservée aux abonnements PRO et BUSINESS.", 'error');
+        showToast("L'insertion d'images via HTML est réservée aux abonnements PRO et BUSINESS. Cliquez ici pour voir nos offres.", 'error');
         return;
       }
     };
@@ -190,7 +196,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ documents, profile, storageUsag
         for (let i = 0; i < files.length; i++) {
           if (files[i].type.startsWith('image/')) {
             e.preventDefault();
-            showToast("Le glisser-déposer d'images est réservé aux abonnements PRO et BUSINESS.", 'error');
+            showToast("Le glisser-déposer d'images est réservé aux abonnements PRO et BUSINESS. Cliquez ici pour évoluer.", 'error');
             return;
           }
         }
@@ -199,7 +205,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ documents, profile, storageUsag
       // 2. Check HTML drop (images from other tabs)
       if (html && html.toLowerCase().includes('<img')) {
         e.preventDefault();
-        showToast("Le transfert d'images est réservé aux abonnements PRO et BUSINESS.", 'error');
+        showToast("Le transfert d'images est réservé aux abonnements PRO et BUSINESS. Cliquez ici pour voir les plans.", 'error');
         return;
       }
     };
@@ -371,7 +377,15 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ documents, profile, storageUsag
       </div>
 
       {toast && (
-        <div className={`fixed top-24 left-1/2 -translate-x-1/2 z-[300] px-6 py-3 rounded-2xl shadow-2xl font-black text-[10px] uppercase tracking-widest animate-fade-in border flex items-center gap-3 ${toast.type === 'success' ? 'bg-white border-green-100 text-green-600' : 'bg-white border-red-100 text-red-600'}`}>
+        <div 
+          onClick={() => {
+            if (toast.message.includes('Abonnement') || toast.message.includes('offre') || toast.message.includes('offre') || toast.message.includes('évoluer') || toast.message.includes('plans') || toast.message.includes('Cliquez ici')) {
+              if (onUpgrade) onUpgrade();
+            }
+            setToast(null);
+          }}
+          className={`fixed top-24 left-1/2 -translate-x-1/2 z-[300] px-6 py-3 rounded-2xl shadow-2xl font-black text-[10px] uppercase tracking-widest animate-fade-in border flex items-center gap-3 cursor-pointer hover:scale-105 transition-all ${toast.type === 'success' ? 'bg-white border-green-100 text-green-600' : 'bg-white border-red-100 text-red-600'}`}
+        >
           <i className={`fas ${toast.type === 'success' ? 'fa-circle-check' : 'fa-circle-exclamation'}`}></i>
           {toast.message}
         </div>

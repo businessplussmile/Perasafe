@@ -545,6 +545,7 @@ const App: React.FC = () => {
               onAddDocument={addDocument} 
               onImportDocuments={importDocuments} 
               onUpdateCode={updateDocCode} 
+              onUpgrade={() => setIsSubscriptionModalOpen(true)}
               onToggleStatus={toggleDocStatus} 
               onDeleteDocument={setDocToDelete} 
             />
