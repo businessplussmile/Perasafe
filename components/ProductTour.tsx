@@ -4,6 +4,10 @@ import { Joyride, STATUS } from 'react-joyride';
 interface ProductTourProps {
   role: 'COMPANY_OWNER' | 'PARTNER';
   userId: string;
+  viewMode: string;
+  hasSeenAdminTour?: boolean;
+  hasSeenUserTour?: boolean;
+  onTourComplete: (type: 'admin' | 'user') => void;
 }
 
 const CustomTooltip = ({
@@ -70,31 +74,58 @@ const CustomTooltip = ({
   );
 };
 
-const ProductTour: React.FC<ProductTourProps> = ({ role, userId }) => {
+const ProductTour: React.FC<ProductTourProps> = ({ role, userId, viewMode, hasSeenAdminTour, hasSeenUserTour, onTourComplete }) => {
   const [run, setRun] = useState(false);
 
   useEffect(() => {
-    // Check if the user has already seen the tour
-    const tourKey = `perasafe_tour_completed_${userId}`;
-    const hasSeenTour = localStorage.getItem(tourKey);
+    // Determine which tour key to use based on viewMode
+    const tourType = viewMode === 'ADMIN' ? 'admin' : 'user';
+    const dbSeen = tourType === 'admin' ? hasSeenAdminTour : hasSeenUserTour;
+    
+    // Backup check with localStorage to prevent flickering during DB sync
+    const localKey = `perasafe_tour_seen_${tourType}_${userId}`;
+    const localSeen = localStorage.getItem(localKey) === 'true';
+    
+    const isSeen = dbSeen || localSeen;
 
-    if (!hasSeenTour) {
-      // Small delay to ensure the DOM is fully rendered
-      setTimeout(() => {
-        setRun(true);
-      }, 1000);
+    let timeoutId: any;
+
+    if (!isSeen) {
+      if ((role === 'COMPANY_OWNER' && viewMode === 'ADMIN') || 
+          (role === 'PARTNER' && viewMode === 'USER') || 
+          (role === 'COMPANY_OWNER' && viewMode === 'USER')) {
+        timeoutId = setTimeout(() => {
+          setRun(true);
+        }, 1500); 
+      }
+    } else {
+      setRun(false);
     }
-  }, [userId]);
+
+    return () => {
+      if (timeoutId) clearTimeout(timeoutId);
+    };
+  }, [userId, role, viewMode, hasSeenAdminTour, hasSeenUserTour]);
 
   const handleJoyrideCallback = (data: any) => {
-    const { status } = data;
+    const { status, action } = data;
     const finishedStatuses: string[] = [STATUS.FINISHED, STATUS.SKIPPED];
 
-    if (finishedStatuses.includes(status)) {
+    // Added action === 'close' to handle clicking the "Passer" or X button definitively
+    if (finishedStatuses.includes(status) || action === 'close') {
       setRun(false);
-      localStorage.setItem(`perasafe_tour_completed_${userId}`, 'true');
+      const tourType = viewMode === 'ADMIN' ? 'admin' : 'user';
+      
+      // Update local storage for immediate effect
+      const localKey = `perasafe_tour_seen_${tourType}_${userId}`;
+      localStorage.setItem(localKey, 'true');
+      
+      // Update database for persistence
+      onTourComplete(tourType);
     }
   };
+
+  if (!run) return null;
 
   const adminSteps: any[] = [
     {
@@ -160,7 +191,7 @@ const ProductTour: React.FC<ProductTourProps> = ({ role, userId }) => {
     }
   ];
 
-  const steps = role === 'COMPANY_OWNER' ? adminSteps : partnerSteps;
+  const steps = viewMode === 'ADMIN' ? adminSteps : partnerSteps;
 
   const JoyrideComponent = Joyride as any;
 

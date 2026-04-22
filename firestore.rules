@@ -55,6 +55,8 @@ service cloud.firestore {
                (!('subscriptionTier' in data) || data.subscriptionTier in ['STANDARD', 'PRO', 'BUSINESS']) &&
                (!('subscriptionStatus' in data) || data.subscriptionStatus in ['NONE', 'PENDING', 'ACTIVE']) &&
                (!('subscriptionExpiresAt' in data) || data.subscriptionExpiresAt is number) &&
+               (!('hasSeenAdminTour' in data) || data.hasSeenAdminTour is bool) &&
+               (!('hasSeenUserTour' in data) || data.hasSeenUserTour is bool) &&
                (!('onboardingCompleted' in data) || data.onboardingCompleted is bool);
       }
 
@@ -65,7 +67,7 @@ service cloud.firestore {
                         incoming().email == existing().email &&
                         (incoming().role == existing().role || (existing().role == 'COMPANY_OWNER' && incoming().role == 'PARTNER')) && 
                         !('isBlocked' in incoming()) && 
-                        incoming().diff(existing()).affectedKeys().hasOnly(['name', 'companyId', 'subscriptionStatus', 'requestedTier', 'onboardingData', 'onboardingCompleted', 'subscriptionTier', 'subscriptionExpiresAt', 'role']) &&
+                        incoming().diff(existing()).affectedKeys().hasOnly(['name', 'companyId', 'subscriptionStatus', 'requestedTier', 'onboardingData', 'onboardingCompleted', 'subscriptionTier', 'subscriptionExpiresAt', 'role', 'hasSeenAdminTour', 'hasSeenUserTour']) &&
                         // Logic guards for self-updates
                         (incoming().subscriptionStatus in ['NONE', 'PENDING'] || (incoming().role == 'PARTNER' && incoming().subscriptionStatus == 'ACTIVE') || isAdmin())
                        ) || isAdmin()

@@ -105,6 +105,10 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ documents, profile, storageUsag
   };
 
   const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (profile?.subscriptionTier === 'STANDARD' || profile?.subscriptionTier === 'FREE' || !profile?.subscriptionTier) {
+      showToast("L'importation groupée est réservée aux abonnements PRO et BUSINESS.", 'error');
+      return;
+    }
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
@@ -183,7 +187,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ documents, profile, storageUsag
     }
     
     // Check partner limits based on subscription
-    const tier = profile?.subscriptionTier || 'STANDARD';
+    const tier = profile?.subscriptionTier || 'FREE';
     const limit = PARTNER_LIMITS[tier];
     
     if (partnerIds.length > limit) {
@@ -200,7 +204,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ documents, profile, storageUsag
     const file = e.target.files?.[0];
     if (!file || !profile) return;
 
-    if (profile.subscriptionTier === 'STANDARD') {
+    if (profile.subscriptionTier === 'STANDARD' || profile.subscriptionTier === 'FREE' || !profile.subscriptionTier) {
       showToast("L'ajout d'images est réservé aux abonnements PRO et BUSINESS.", 'error');
       return;
     }
@@ -239,6 +243,11 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ documents, profile, storageUsag
   };
 
   const generateSummary = async () => {
+    if (profile?.subscriptionTier === 'STANDARD' || profile?.subscriptionTier === 'FREE' || !profile?.subscriptionTier) {
+      showToast("La synthèse stratégique IA est réservée aux abonnements PRO et BUSINESS.", 'error');
+      return;
+    }
+    
     const content = editorRef.current?.innerText || '';
     if (!content || content.length < 50) {
       showToast("Contenu trop court pour l'analyse.", 'error');
@@ -379,8 +388,8 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ documents, profile, storageUsag
                   <button 
                     type="button"
                     onClick={generateSummary}
-                    disabled={isSummarizing}
-                    className="flex items-center gap-2 px-4 py-2 bg-indigo-50 text-indigo-600 rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-indigo-100 transition-all disabled:opacity-50"
+                    disabled={isSummarizing || profile?.subscriptionTier === 'STANDARD' || profile?.subscriptionTier === 'FREE'}
+                    className="flex items-center gap-2 px-4 py-2 bg-indigo-50 text-indigo-600 rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-indigo-100 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {isSummarizing ? <Loader2 className="w-3 h-3 animate-spin"/> : <Sparkles className="w-3 h-3" />}
                     {isSummarizing ? 'Analyse...' : 'Synthèse Stratégique'}
@@ -407,7 +416,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ documents, profile, storageUsag
               <div>
                 <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1 flex justify-between">
                   <span>Partenaires (Obligatoire)</span>
-                  <span className="text-indigo-600">Limite: {PARTNER_LIMITS[profile?.subscriptionTier || 'STANDARD']}</span>
+                  <span className="text-indigo-600">Limite: {PARTNER_LIMITS[profile?.subscriptionTier || 'FREE']}</span>
                 </label>
                 <div className="relative">
                   <input 
@@ -447,77 +456,77 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ documents, profile, storageUsag
             </div>
           </div>
 
-          <div className="bg-white px-4 py-3 border-b border-slate-100 flex items-center gap-1 overflow-x-auto sticky top-0 z-40 shadow-sm scrollbar-hide">
-            <div className="flex items-center gap-0.5 border-r border-slate-100 pr-1 mr-1">
-              <button type="button" onMouseDown={(e) => handleCommand(e, 'undo')} className="w-8 h-8 rounded-lg hover:bg-slate-50 text-slate-500 transition-colors" title="Annuler"><i className="fas fa-undo text-[10px]"></i></button>
-              <button type="button" onMouseDown={(e) => handleCommand(e, 'redo')} className="w-8 h-8 rounded-lg hover:bg-slate-50 text-slate-500 transition-colors" title="Rétablir"><i className="fas fa-redo text-[10px]"></i></button>
-            </div>
-
-            <div className="flex items-center gap-1.5 border-r border-slate-100 pr-3 mr-1">
-              <select 
-                onChange={(e) => { setActiveFont(e.target.value); document.execCommand('fontName', false, e.target.value); }}
-                className="bg-slate-50 border border-slate-100 rounded-lg px-2 py-1.5 text-[9px] font-bold text-slate-600 outline-none cursor-pointer"
-              >
-                {FONTS.map(f => <option key={f.value} value={f.value}>{f.label}</option>)}
-              </select>
-              <select 
-                onChange={(e) => document.execCommand('fontSize', false, e.target.value)}
-                className="bg-slate-50 border border-slate-100 rounded-lg px-2 py-1.5 text-[9px] font-bold text-slate-600 outline-none cursor-pointer"
-                defaultValue={'3'}
-              >
-                {SIZES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
-              </select>
-            </div>
-
-            <div className="flex items-center gap-0.5 border-r border-slate-100 pr-1 mr-1">
-              <button type="button" onMouseDown={(e) => handleCommand(e, 'bold')} className="w-9 h-9 rounded-lg hover:bg-slate-100 text-slate-800 font-black" title="Gras"><i className="fas fa-bold text-xs"></i></button>
-              <button type="button" onMouseDown={(e) => handleCommand(e, 'italic')} className="w-9 h-9 rounded-lg hover:bg-slate-100 text-slate-800" title="Italique"><i className="fas fa-italic text-xs"></i></button>
-              <button type="button" onMouseDown={(e) => handleCommand(e, 'underline')} className="w-9 h-9 rounded-lg hover:bg-slate-100 text-slate-800" title="Souligné"><i className="fas fa-underline text-xs"></i></button>
-            </div>
-
-            <div className="flex items-center gap-0.5 border-r border-slate-100 pr-1 mr-1">
-              <div className="relative group/color">
-                <button type="button" className="w-9 h-9 rounded-lg hover:bg-slate-100 text-[#643012] flex flex-col items-center justify-center gap-0.5" title="Couleur du texte">
-                  <i className="fas fa-font text-xs"></i>
-                  <div className="w-4 h-[2px] bg-[#643012]"></div>
-                </button>
-                <div className="absolute hidden group-hover/color:grid grid-cols-4 gap-1 bg-white p-2 rounded-xl shadow-2xl border border-slate-100 top-full left-0 z-50 min-w-[100px]">
-                  {COLORS.map(c => (
-                    <button key={c.value} type="button" onMouseDown={(e) => handleCommand(e, 'foreColor', c.value)} className="w-5 h-5 rounded-full border border-slate-100 shadow-sm" style={{ backgroundColor: c.value }} title={c.label} />
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-0.5 border-r border-slate-100 pr-1 mr-1">
-              <button type="button" onMouseDown={(e) => handleCommand(e, 'justifyLeft')} className="w-8 h-8 rounded-lg hover:bg-slate-100 text-slate-600" title="Aligner à gauche"><i className="fas fa-align-left text-[10px]"></i></button>
-              <button type="button" onMouseDown={(e) => handleCommand(e, 'justifyCenter')} className="w-8 h-8 rounded-lg hover:bg-slate-100 text-slate-600" title="Centrer"><i className="fas fa-align-center text-[10px]"></i></button>
-            </div>
-
-            <div className="flex items-center gap-1.5 ml-auto">
-              <input type="file" ref={fileInputRef} onChange={handleImageUpload} accept="image/*" className="hidden" />
-              <button 
-                type="button" 
-                onClick={() => fileInputRef.current?.click()} 
-                className={`bg-[#643012] text-[#F2AF31] px-3 py-1.5 rounded-lg text-[8px] font-black uppercase tracking-widest hover:brightness-110 transition-all flex items-center gap-2 ${profile?.subscriptionTier === 'STANDARD' ? 'opacity-50 grayscale' : ''}`}
-                disabled={isUploadingImage}
-              >
-                {isUploadingImage ? <Loader2 className="w-3 h-3 animate-spin"/> : <ImageIcon className="w-3 h-3" />}
-                <span className="hidden lg:inline">{isUploadingImage ? 'Compression...' : 'Média'}</span>
-              </button>
-              <button type="button" onClick={() => setIsFullScreen(!isFullScreen)} className="w-8 h-8 text-slate-300 hover:text-[#643012] transition-colors"><i className={`fas ${isFullScreen ? 'fa-compress' : 'fa-expand'} text-[10px]`}></i></button>
-            </div>
-          </div>
-
-          <div className={`relative p-0 md:p-0 bg-slate-100/50 ${isFullScreen ? 'fixed inset-0 z-[100] bg-slate-200/80 backdrop-blur-md overflow-y-auto pt-24' : ''}`}>
+          <div className={`relative p-0 md:p-0 bg-slate-100/50 ${isFullScreen ? 'fixed inset-0 z-[100] bg-slate-200/80 backdrop-blur-md overflow-y-auto' : ''}`}>
             {isFullScreen && (
-              <div className="fixed top-6 right-10 flex gap-4 z-[110]">
-                 <button type="button" onClick={() => setIsFullScreen(false)} className="bg-slate-900 text-white w-12 h-12 rounded-full flex items-center justify-center shadow-2xl hover:scale-110 transition-transform"><i className="fas fa-times"></i></button>
+              <div className="fixed top-4 right-4 z-[120]">
+                 <button type="button" onClick={() => setIsFullScreen(false)} className="bg-slate-900 text-white w-10 h-10 md:w-12 md:h-12 rounded-full flex items-center justify-center shadow-2xl hover:scale-110 transition-transform"><i className="fas fa-times"></i></button>
               </div>
             )}
-            
-            <div className="w-full relative">
-              <div className="relative bg-white shadow-2xl min-h-[1100px] border border-slate-100 flex flex-col">
+
+            <div className={`bg-white px-4 py-3 border-b border-slate-100 flex items-center gap-1 overflow-x-auto shadow-sm scrollbar-hide ${isFullScreen ? 'sticky top-0 z-[110]' : 'sticky top-0 z-40'}`}>
+              <div className="flex items-center gap-0.5 border-r border-slate-100 pr-1 mr-1">
+                <button type="button" onMouseDown={(e) => handleCommand(e, 'undo')} className="w-8 h-8 rounded-lg hover:bg-slate-50 text-slate-500 transition-colors" title="Annuler"><i className="fas fa-undo text-[10px]"></i></button>
+                <button type="button" onMouseDown={(e) => handleCommand(e, 'redo')} className="w-8 h-8 rounded-lg hover:bg-slate-50 text-slate-500 transition-colors" title="Rétablir"><i className="fas fa-redo text-[10px]"></i></button>
+              </div>
+
+              <div className="flex items-center gap-1.5 border-r border-slate-100 pr-3 mr-1">
+                <select 
+                  onChange={(e) => { setActiveFont(e.target.value); document.execCommand('fontName', false, e.target.value); }}
+                  className="bg-slate-50 border border-slate-100 rounded-lg px-2 py-1.5 text-[9px] font-bold text-slate-600 outline-none cursor-pointer"
+                >
+                  {FONTS.map(f => <option key={f.value} value={f.value}>{f.label}</option>)}
+                </select>
+                <select 
+                  onChange={(e) => document.execCommand('fontSize', false, e.target.value)}
+                  className="bg-slate-50 border border-slate-100 rounded-lg px-2 py-1.5 text-[9px] font-bold text-slate-600 outline-none cursor-pointer"
+                  defaultValue={'3'}
+                >
+                  {SIZES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+                </select>
+              </div>
+
+              <div className="flex items-center gap-0.5 border-r border-slate-100 pr-1 mr-1">
+                <button type="button" onMouseDown={(e) => handleCommand(e, 'bold')} className="w-9 h-9 rounded-lg hover:bg-slate-100 text-slate-800 font-black" title="Gras"><i className="fas fa-bold text-xs"></i></button>
+                <button type="button" onMouseDown={(e) => handleCommand(e, 'italic')} className="w-9 h-9 rounded-lg hover:bg-slate-100 text-slate-800" title="Italique"><i className="fas fa-italic text-xs"></i></button>
+                <button type="button" onMouseDown={(e) => handleCommand(e, 'underline')} className="w-9 h-9 rounded-lg hover:bg-slate-100 text-slate-800" title="Souligné"><i className="fas fa-underline text-xs"></i></button>
+              </div>
+
+              <div className="flex items-center gap-0.5 border-r border-slate-100 pr-1 mr-1">
+                <div className="relative group/color">
+                  <button type="button" className="w-9 h-9 rounded-lg hover:bg-slate-100 text-[#643012] flex flex-col items-center justify-center gap-0.5" title="Couleur du texte">
+                    <i className="fas fa-font text-xs"></i>
+                    <div className="w-4 h-[2px] bg-[#643012]"></div>
+                  </button>
+                  <div className="absolute hidden group-hover/color:grid grid-cols-4 gap-1 bg-white p-2 rounded-xl shadow-2xl border border-slate-100 top-full left-0 z-50 min-w-[100px]">
+                    {COLORS.map(c => (
+                      <button key={c.value} type="button" onMouseDown={(e) => handleCommand(e, 'foreColor', c.value)} className="w-5 h-5 rounded-full border border-slate-100 shadow-sm" style={{ backgroundColor: c.value }} title={c.label} />
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-0.5 border-r border-slate-100 pr-1 mr-1">
+                <button type="button" onMouseDown={(e) => handleCommand(e, 'justifyLeft')} className="w-8 h-8 rounded-lg hover:bg-slate-100 text-slate-600" title="Aligner à gauche"><i className="fas fa-align-left text-[10px]"></i></button>
+                <button type="button" onMouseDown={(e) => handleCommand(e, 'justifyCenter')} className="w-8 h-8 rounded-lg hover:bg-slate-100 text-slate-600" title="Centrer"><i className="fas fa-align-center text-[10px]"></i></button>
+              </div>
+
+              <div className="flex items-center gap-1.5 ml-auto">
+                <input type="file" ref={fileInputRef} onChange={handleImageUpload} accept="image/*" className="hidden" />
+                <button 
+                  type="button" 
+                  onClick={() => fileInputRef.current?.click()} 
+                  className={`bg-[#643012] text-[#F2AF31] px-3 py-1.5 rounded-lg text-[8px] font-black uppercase tracking-widest hover:brightness-110 transition-all flex items-center gap-2 ${(profile?.subscriptionTier === 'STANDARD' || profile?.subscriptionTier === 'FREE' || !profile?.subscriptionTier) ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  disabled={isUploadingImage || profile?.subscriptionTier === 'STANDARD' || profile?.subscriptionTier === 'FREE' || !profile?.subscriptionTier}
+                >
+                  {isUploadingImage ? <Loader2 className="w-3 h-3 animate-spin"/> : <ImageIcon className="w-3 h-3" />}
+                  <span className="hidden lg:inline">{isUploadingImage ? 'Compression...' : 'Média'}</span>
+                </button>
+                <button type="button" onClick={() => setIsFullScreen(!isFullScreen)} className="w-8 h-8 text-slate-300 hover:text-[#643012] transition-colors"><i className={`fas ${isFullScreen ? 'fa-compress' : 'fa-expand'} text-[10px]`}></i></button>
+              </div>
+            </div>
+
+            <div className={`w-full relative ${isFullScreen ? 'mt-4 max-w-5xl mx-auto' : ''}`}>
+              <div className="relative bg-white shadow-2xl min-h-[60vh] lg:min-h-[1100px] border border-slate-100 flex flex-col">
                  
                  <div className="h-4 md:h-6 bg-[#643012] w-full"></div>
 
@@ -602,13 +611,15 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ documents, profile, storageUsag
             <input type="file" ref={importFileInputRef} className="hidden" accept=".peravault" onChange={handleImport} />
             <button 
               onClick={() => importFileInputRef.current?.click()} 
-              className="flex-1 md:flex-none bg-slate-100 text-slate-600 font-black px-8 py-4 md:py-6 rounded-2xl text-[9px] md:text-[10px] uppercase tracking-widest btn-active transition-all"
+              disabled={profile?.subscriptionTier === 'STANDARD' || profile?.subscriptionTier === 'FREE'}
+              className={`flex-1 md:flex-none bg-slate-100 text-slate-600 font-black px-8 py-4 md:py-6 rounded-2xl text-[9px] md:text-[10px] uppercase tracking-widest btn-active transition-all ${(profile?.subscriptionTier === 'STANDARD' || profile?.subscriptionTier === 'FREE' || !profile?.subscriptionTier) ? 'opacity-50 cursor-not-allowed' : ''}`}
             >
               Importer
             </button>
             <button 
               onClick={() => exportPackage(documents, 'vault-backup')} 
-              className="flex-1 md:flex-none bg-indigo-600 text-white font-black px-8 py-4 md:py-6 rounded-2xl text-[9px] md:text-[10px] uppercase tracking-widest shadow-lg btn-active transition-all"
+              disabled={profile?.subscriptionTier === 'STANDARD' || profile?.subscriptionTier === 'FREE'}
+              className={`flex-1 md:flex-none bg-indigo-600 text-white font-black px-8 py-4 md:py-6 rounded-2xl text-[9px] md:text-[10px] uppercase tracking-widest shadow-lg btn-active transition-all ${(profile?.subscriptionTier === 'STANDARD' || profile?.subscriptionTier === 'FREE' || !profile?.subscriptionTier) ? 'opacity-50 cursor-not-allowed' : ''}`}
             >
               Sauvegarder tout
             </button>

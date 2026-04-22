@@ -4,8 +4,8 @@ export interface UserProfile {
   email: string;
   role: 'ADMIN' | 'COMPANY_OWNER' | 'PARTNER';
   companyId?: string;
-  subscriptionTier?: 'STANDARD' | 'PRO' | 'BUSINESS';
-  requestedTier?: 'STANDARD' | 'PRO' | 'BUSINESS';
+  subscriptionTier?: 'FREE' | 'STANDARD' | 'PRO' | 'BUSINESS';
+  requestedTier?: 'FREE' | 'STANDARD' | 'PRO' | 'BUSINESS';
   subscriptionStatus?: 'NONE' | 'PENDING' | 'ACTIVE';
   onboardingCompleted?: boolean;
   onboardingData?: {
@@ -17,6 +17,8 @@ export interface UserProfile {
   isBlocked?: boolean;
   createdAt: number;
   subscriptionExpiresAt?: number;
+  hasSeenAdminTour?: boolean;
+  hasSeenUserTour?: boolean;
 }
 
 export interface Company {
@@ -43,6 +45,7 @@ export interface SecureDocument {
   lastCodeUsedAtOpening?: string;
   summary?: string;
   validityDuration?: number; // In milliseconds
+  companyName?: string;
 }
 
 export type ViewMode = 'LANDING' | 'USER' | 'ADMIN' | 'VIEWER' | 'LOGIN' | 'ONBOARDING' | 'SUBSCRIPTION' | 'PROTOCOL' | 'PRIVACY';

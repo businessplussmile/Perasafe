@@ -8,30 +8,47 @@ interface UserDocGridProps {
   isAdmin?: boolean;
   onDeleteDoc?: (id: string) => void;
   onImportDocuments?: (docs: SecureDocument[]) => void;
+  currentCompanyId?: string;
 }
 
 const SIGNATURE = "PERADOC-SIG-X14";
 
-const UserDocGrid: React.FC<UserDocGridProps> = ({ documents, onOpenDoc, isAdmin, onDeleteDoc, onImportDocuments }) => {
+const UserDocGrid: React.FC<UserDocGridProps> = ({ documents, onOpenDoc, isAdmin, onDeleteDoc, onImportDocuments, currentCompanyId }) => {
   const [selectedDoc, setSelectedDoc] = useState<SecureDocument | null>(null);
   const [inputCode, setInputCode] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [error, setError] = useState('');
   const importFileInputRef = useRef<HTMLInputElement>(null);
 
+  const isDocExpired = (doc: SecureDocument) => {
+    if (doc.isConsumed) return true;
+    if (doc.lifespanStart) {
+      const now = Date.now();
+      const duration = doc.validityDuration || 24 * 60 * 60 * 1000;
+      return now - doc.lifespanStart >= duration;
+    }
+    return false;
+  };
+
   const filteredDocuments = React.useMemo(() => {
-    if (!searchQuery.trim()) return documents;
-    const query = searchQuery.toLowerCase().trim();
-    return documents.filter(doc => 
-      doc.title.toLowerCase().includes(query) || 
-      (doc.summary && doc.summary.toLowerCase().includes(query))
-    );
+    let docs = documents;
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase().trim();
+      docs = documents.filter(doc => 
+        doc.title.toLowerCase().includes(query) || 
+        (doc.summary && doc.summary.toLowerCase().includes(query))
+      );
+    }
+    return docs;
   }, [documents, searchQuery]);
+
+  const activeDocsCount = documents.filter(d => !isDocExpired(d)).length;
+  const expiredDocsCount = documents.filter(d => isDocExpired(d)).length;
 
   const handleUnlock = () => {
     if (!selectedDoc) return;
     if (inputCode === selectedDoc.accessCode) {
-      if (selectedDoc.isConsumed) {
+      if (isDocExpired(selectedDoc)) {
         setError("Accès révoqué définitivement.");
         return;
       }
@@ -117,11 +134,11 @@ const UserDocGrid: React.FC<UserDocGridProps> = ({ documents, onOpenDoc, isAdmin
           <div className="flex gap-3 md:gap-4 w-full sm:w-auto">
             <div className="flex-1 sm:flex-none bg-white px-5 md:px-6 py-3 md:py-4 rounded-2xl shadow-sm border border-slate-100 flex flex-col min-w-[100px] md:min-w-[120px]">
               <span className="text-slate-400 text-[8px] md:text-[9px] font-black uppercase tracking-widest mb-0.5">Dossiers</span>
-              <span className="text-xl md:text-2xl font-black text-slate-900">{documents.filter(d => !d.isConsumed).length}</span>
+              <span className="text-xl md:text-2xl font-black text-slate-900">{activeDocsCount}</span>
             </div>
             <div className="flex-1 sm:flex-none bg-slate-100 px-5 md:px-6 py-3 md:py-4 rounded-2xl border border-slate-200 flex flex-col min-w-[100px] md:min-w-[120px]">
               <span className="text-slate-400 text-[8px] md:text-[9px] font-black uppercase tracking-widest mb-0.5">Archives</span>
-              <span className="text-xl md:text-2xl font-black text-slate-400">{documents.filter(d => d.isConsumed).length}</span>
+              <span className="text-xl md:text-2xl font-black text-slate-400">{expiredDocsCount}</span>
             </div>
           </div>
         </div>
@@ -134,16 +151,18 @@ const UserDocGrid: React.FC<UserDocGridProps> = ({ documents, onOpenDoc, isAdmin
             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Aucun document stratégique ne correspond à votre recherche</p>
           </div>
         ) : (
-          filteredDocuments.map(doc => (
+          filteredDocuments.map(doc => {
+            const expired = isDocExpired(doc);
+            return (
             <div 
               key={doc.id}
               className={`group relative rounded-[2rem] md:rounded-[3rem] p-6 md:p-10 transition-all duration-500 border-2 ${
-                doc.isConsumed 
+                expired 
                   ? 'bg-slate-50 border-slate-100 cursor-not-allowed grayscale opacity-50' 
                   : 'bg-white border-white hover:border-indigo-600/30 cursor-pointer shadow-md hover:shadow-xl'
               }`}
             >
-              {isAdmin && onDeleteDoc && (
+              {isAdmin && onDeleteDoc && doc.companyId === currentCompanyId && (
                 <button 
                   onClick={(e) => { e.stopPropagation(); onDeleteDoc(doc.id); }}
                   className="absolute top-4 right-4 md:top-6 md:right-6 w-9 h-9 md:w-10 md:h-10 rounded-xl bg-red-50 text-red-500 sm:opacity-0 group-hover:opacity-100 transition-all hover:bg-red-500 hover:text-white z-10 flex items-center justify-center btn-active"
@@ -153,23 +172,28 @@ const UserDocGrid: React.FC<UserDocGridProps> = ({ documents, onOpenDoc, isAdmin
               )}
 
               <div 
-                onClick={() => !doc.isConsumed && setSelectedDoc(doc)}
+                onClick={() => !expired && setSelectedDoc(doc)}
                 className="relative h-full"
               >
                 <div className={`w-12 h-12 md:w-16 md:h-16 rounded-2xl md:rounded-[1.5rem] flex items-center justify-center mb-5 md:mb-10 transition-all ${
-                  doc.isConsumed ? 'bg-slate-200 text-slate-400' : 'bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white'
+                  expired ? 'bg-slate-200 text-slate-400' : 'bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white'
                 }`}>
-                  <i className={`fas ${doc.isConsumed ? 'fa-vault' : 'fa-box-archive'} text-lg md:text-2xl`}></i>
+                  <i className={`fas ${expired ? 'fa-vault' : 'fa-box-archive'} text-lg md:text-2xl`}></i>
                 </div>
                 <div className="space-y-1.5 md:space-y-2">
                   <h3 className="text-base md:text-xl font-black text-slate-800 truncate uppercase tracking-tight">{doc.title}</h3>
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <span 
                       className="text-[7px] md:text-[8px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full inline-block"
-                      style={!doc.isConsumed ? { backgroundColor: '#F2AF31', color: '#643012' } : { backgroundColor: '#e2e8f0', color: '#64748b' }}
+                      style={!expired ? { backgroundColor: '#F2AF31', color: '#643012' } : { backgroundColor: '#e2e8f0', color: '#64748b' }}
                     >
-                      {doc.isConsumed ? 'ARCHIVÉ' : 'SECRET D\'ENTREPRISE'}
+                      {expired ? 'ARCHIVÉ / EXPIRÉ' : 'SECRET D\'ENTREPRISE'}
                     </span>
+                    {doc.companyName && (
+                      <span className="text-[7px] md:text-[8px] font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full uppercase truncate max-w-[120px]">
+                        {doc.companyName}
+                      </span>
+                    )}
                   </div>
                   {doc.summary && (
                     <p className="text-[9px] font-medium text-slate-400 line-clamp-2 uppercase tracking-wide leading-relaxed pt-2">
@@ -179,7 +203,8 @@ const UserDocGrid: React.FC<UserDocGridProps> = ({ documents, onOpenDoc, isAdmin
                 </div>
               </div>
             </div>
-          ))
+            );
+          })
         )}
       </div>
 

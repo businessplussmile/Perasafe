@@ -52,7 +52,7 @@ const LoginPortal: React.FC<LoginPortalProps> = ({ onBack }) => {
               <Fingerprint className={`w-10 h-10 ${status === 'scanning' ? 'animate-pulse' : ''}`} />
               {status === 'scanning' && (
                 <div className="absolute inset-x-4 inset-y-4 overflow-hidden rounded-[1rem]">
-                  <div className="w-full h-[2px] bg-indigo-500 shadow-[0_0_15px_#6366f1] animate-[scan_2s_infinite_linear]"></div>
+                  <div className="absolute left-0 w-full h-[2px] bg-indigo-500 shadow-[0_0_15px_#6366f1] animate-[scan_2s_infinite_linear]"></div>
                 </div>
               )}
             </div>
@@ -99,7 +99,7 @@ const LoginPortal: React.FC<LoginPortalProps> = ({ onBack }) => {
         </div>
       </div>
       <style>{`
-        @keyframes scan { 0% { transform: translateY(-5px); opacity: 0; } 20% { opacity: 1; } 100% { transform: translateY(65px); opacity: 0; } }
+        @keyframes scan { 0% { top: -5%; opacity: 0; } 20% { opacity: 1; } 100% { top: 105%; opacity: 0; } }
         @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
         .animate-shake { animation: shake 0.3s ease-in-out; }
       `}</style>

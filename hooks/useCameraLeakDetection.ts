@@ -11,16 +11,22 @@ export const useCameraLeakDetection = (documentId: string, ownerEmail: string, r
   const streamRef = useRef<MediaStream | null>(null);
   const detectionIntervalRef = useRef<number | null>(null);
 
+  const isMounted = useRef(true);
+
   useEffect(() => {
+    isMounted.current = true;
+    
     // 1. Load the COCO-SSD model.
     const loadModel = async () => {
       try {
         await tf.ready();
         const model = await cocoSsd.load();
+        if (!isMounted.current) return;
         modelRef.current = model;
         setModelLoaded(true);
         console.log("Anti-leak detection model loaded.");
       } catch (error) {
+        if (!isMounted.current) return;
         console.error("Failed to load detection model", error);
       }
     };
@@ -32,6 +38,10 @@ export const useCameraLeakDetection = (documentId: string, ownerEmail: string, r
         const stream = await navigator.mediaDevices.getUserMedia({ 
           video: { facingMode: 'user', width: 640, height: 480 } 
         });
+        if (!isMounted.current) {
+          stream.getTracks().forEach(track => track.stop());
+          return;
+        }
         streamRef.current = stream;
         
         if (!videoRef.current) {
@@ -46,9 +56,11 @@ export const useCameraLeakDetection = (documentId: string, ownerEmail: string, r
         videoRef.current.srcObject = stream;
         
         videoRef.current.onloadedmetadata = () => {
+          if (!isMounted.current) return;
           setCameraEnabled(true);
         };
       } catch (error) {
+        if (!isMounted.current) return;
         console.error("Camera access denied or unavailable", error);
         alert("La sécurisation PeraSafe requiert l'accès à la caméra pour prévenir les fuites de données (anti-photo).");
       }
@@ -57,20 +69,28 @@ export const useCameraLeakDetection = (documentId: string, ownerEmail: string, r
     setupCamera();
 
     return () => {
+      isMounted.current = false;
       if (detectionIntervalRef.current) {
         window.clearInterval(detectionIntervalRef.current);
       }
       if (streamRef.current) {
-        streamRef.current.getTracks().forEach(track => track.stop());
+        streamRef.current.getTracks().forEach(track => {
+          track.stop();
+        });
+        streamRef.current = null;
       }
-      if (videoRef.current && videoRef.current.parentNode) {
-        videoRef.current.parentNode.removeChild(videoRef.current);
+      if (videoRef.current) {
+        videoRef.current.srcObject = null;
+        if (videoRef.current.parentNode) {
+          videoRef.current.parentNode.removeChild(videoRef.current);
+        }
+        videoRef.current = null;
       }
     };
   }, []);
 
   const signalLeak = useCallback(async () => {
-    if (leakDetected) return; // Prevent multiple signals
+    if (leakDetected || !isMounted.current) return; // Prevent multiple signals
     setLeakDetected(true);
     
     // In a real environment, this sends an HTTP request to the backend.
@@ -81,9 +101,11 @@ export const useCameraLeakDetection = (documentId: string, ownerEmail: string, r
     try {
       // setTimeout to simulate network latency
       await new Promise(resolve => setTimeout(resolve, 500));
+      if (!isMounted.current) return;
       // TODO: the database could log this "leak_alerts" locally.
       alert(`ALERTE DE SÉCURITÉ: Une caméra ou un téléphone a été détecté. L'accès est révoqué et un signal a été envoyé au super admin et au propriétaire.`);
     } catch(err) {
+      if (!isMounted.current) return;
       console.error(err);
     }
   }, [leakDetected, ownerEmail]);
@@ -92,14 +114,19 @@ export const useCameraLeakDetection = (documentId: string, ownerEmail: string, r
     if (!modelLoaded || !cameraEnabled || leakDetected || !videoRef.current) return;
 
     const detect = async () => {
-      if (videoRef.current && videoRef.current.readyState === 4) {
-        const predictions = await modelRef.current!.detect(videoRef.current);
-        
-        // Check if a "cell phone" is detected in the view
-        const phoneDetected = predictions.some(pred => pred.class === 'cell phone' && pred.score > 0.5);
-        
-        if (phoneDetected) {
-          signalLeak();
+      if (videoRef.current && videoRef.current.readyState === 4 && isMounted.current) {
+        try {
+          const predictions = await modelRef.current!.detect(videoRef.current);
+          if (!isMounted.current) return;
+          
+          // Check if a "cell phone" is detected in the view
+          const phoneDetected = predictions.some(pred => pred.class === 'cell phone' && pred.score > 0.5);
+          
+          if (phoneDetected) {
+            signalLeak();
+          }
+        } catch (e) {
+          // model might fail if video structure is destroyed midway
         }
       }
     };

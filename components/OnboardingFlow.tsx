@@ -13,7 +13,7 @@ interface OnboardingFlowProps {
 
 const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ profile, onComplete, onReturnToLanding }) => {
   const [step, setStep] = useState(1);
-  const [selectedTier, setSelectedTier] = useState<'STANDARD' | 'PRO' | 'BUSINESS'>('STANDARD');
+  const [selectedTier, setSelectedTier] = useState<'FREE' | 'STANDARD' | 'PRO' | 'BUSINESS'>('FREE');
   const [formData, setFormData] = useState({
     companyName: '',
     phone: '',
@@ -59,15 +59,12 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ profile, onComplete, on
     try {
       const userRef = doc(db, 'users', profile.uid);
       await updateDoc(userRef, {
-        role: 'PARTNER',
+        onboardingCompleted: true,
+        // We keep them as COMPANY_OWNER so they can still create their own docs later
+        // without having to "re-create" an account.
         subscriptionStatus: 'ACTIVE',
-        subscriptionTier: 'STANDARD', 
-        onboardingCompleted: true
+        subscriptionTier: 'FREE' 
       });
-      // Cleanup the auto-created company doc to keep the db clean
-      if (profile.companyId) {
-        await deleteDoc(doc(db, 'companies', profile.companyId));
-      }
       if (onComplete) onComplete();
     } catch (error) {
        console.error("Partner setup error:", error);
@@ -97,9 +94,11 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ profile, onComplete, on
     try {
       const userRef = doc(db, 'users', profile.uid);
       await updateDoc(userRef, {
-        subscriptionStatus: 'PENDING',
+        subscriptionStatus: selectedTier === 'FREE' ? 'ACTIVE' : 'PENDING',
+        subscriptionTier: selectedTier === 'FREE' ? 'FREE' : profile.subscriptionTier,
         requestedTier: selectedTier,
-        onboardingData: formData
+        onboardingData: formData,
+        onboardingCompleted: true
       });
       if (onComplete) onComplete();
     } catch (error) {
@@ -141,7 +140,24 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ profile, onComplete, on
                   <p className="text-slate-500 font-medium max-w-lg mx-auto">Avant d'activer votre espace cloud protégé, veuillez choisir le niveau d'infrastructure adapté à votre organisation.</p>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                  {/* Free */}
+                  <div 
+                    onClick={() => setSelectedTier('FREE')}
+                    className={`p-6 rounded-[2.5rem] border-2 transition-all cursor-pointer flex flex-col h-full bg-white relative ${selectedTier === 'FREE' ? 'border-indigo-600 shadow-xl shadow-indigo-600/10' : 'border-slate-100 hover:border-slate-300'}`}
+                  >
+                    {selectedTier === 'FREE' && <div className="absolute top-4 right-4 w-6 h-6 bg-indigo-600 text-white rounded-full flex items-center justify-center"><CheckCircle2 className="w-4 h-4" /></div>}
+                    <div className="mb-4 mt-2">
+                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Découverte</span>
+                      <h3 className="text-2xl font-black uppercase tracking-tighter mb-1 mt-1">Essai</h3>
+                      <div className="text-3xl font-black text-slate-900 mb-6">0<span className="text-[10px] font-bold text-slate-400 ml-1 uppercase">FCFA</span></div>
+                    </div>
+                    <ul className="space-y-3 mb-8 flex-1">
+                      <li className="text-xs font-bold text-slate-600 flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-indigo-500" /> 1 document stratégique</li>
+                      <li className="text-xs font-bold text-slate-600 flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-indigo-500" /> 1 partenaire max</li>
+                    </ul>
+                  </div>
+
                   {/* Standard */}
                   <div 
                     onClick={() => setSelectedTier('STANDARD')}
@@ -155,6 +171,7 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ profile, onComplete, on
                     </div>
                     <ul className="space-y-3 mb-8 flex-1">
                       <li className="text-xs font-bold text-slate-600 flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-indigo-500" /> 5 documents stratégiques</li>
+                      <li className="text-xs font-bold text-slate-600 flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-indigo-500" /> 3 partenaires max</li>
                       <li className="text-xs font-bold text-slate-600 flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-indigo-500" /> Chiffrement AES-256</li>
                     </ul>
                   </div>

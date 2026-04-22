@@ -40,12 +40,12 @@ export function useAuth() {
               email: firebaseUser.email || '',
               role: isAdmin ? 'ADMIN' : 'COMPANY_OWNER',
               companyId: isAdmin ? undefined : companyId,
-              subscriptionTier: 'STANDARD',
-              subscriptionStatus: isAdmin ? 'ACTIVE' : 'NONE',
+              subscriptionTier: 'FREE',
+              subscriptionStatus: 'ACTIVE',
               onboardingCompleted: isAdmin, // Admins bypass onboarding
               name: firebaseUser.displayName || '',
               createdAt: Date.now(),
-              subscriptionExpiresAt: Date.now() + 30 * 24 * 60 * 60 * 1000 // 30 days trial
+              subscriptionExpiresAt: Date.now() + 365 * 24 * 60 * 60 * 1000 // 1 year default
             };
             
             await createUserProfile(newProfile);

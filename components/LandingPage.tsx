@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { motion } from 'motion/react';
-import { ShieldCheck, Zap, Lock, Users, Sparkles, ChevronRight, Play, CheckCircle2, ArrowRight } from 'lucide-react';
+import { ShieldCheck, Zap, Lock, Users, Sparkles, ChevronRight, Play, CheckCircle2, ArrowRight, User } from 'lucide-react';
 import ParallaxSecuritySpace from './ParallaxSecuritySpace';
 import DemoPresentation from './DemoPresentation';
 import InterfaceWalkthrough from './InterfaceWalkthrough';
@@ -92,22 +92,33 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStart, onLogin, onViewProto
               Le premier coffre-fort numérique conçu pour la rédaction stratégique et le partage ultra-sécurisé avec vos partenaires privilégiés.
             </p>
 
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-              <button 
-                onClick={onStart}
-                className="w-full sm:w-auto bg-indigo-600 text-white px-8 py-4 rounded-2xl text-base font-black uppercase tracking-widest shadow-2xl shadow-indigo-600/30 hover:scale-105 hover:bg-indigo-700 transition-all flex items-center justify-center gap-3"
-              >
-                Commencer gratuitement <ChevronRight className="w-4 h-4" />
-              </button>
-              <button 
-                onClick={() => setIsDemoOpen(true)}
-                className="w-full sm:w-auto px-8 py-4 rounded-2xl text-base font-black uppercase tracking-widest text-slate-600 hover:bg-slate-50 transition-all flex items-center justify-center gap-3 group"
-              >
-                <div className="w-8 h-8 bg-slate-100 rounded-full flex items-center justify-center group-hover:bg-indigo-100 transition-colors">
-                  <Play className="w-3.5 h-3.5 text-indigo-600 fill-indigo-600" />
-                </div>
-                Voir Démo
-              </button>
+            <div className="flex flex-col items-center gap-6">
+              <div className="flex flex-col sm:flex-row flex-wrap items-center justify-center gap-4 w-full">
+                <button 
+                  onClick={onStart}
+                  className="w-full sm:w-auto bg-indigo-600 text-white px-6 py-3.5 rounded-2xl text-sm font-black uppercase tracking-widest shadow-2xl shadow-indigo-600/30 hover:scale-105 hover:bg-indigo-700 transition-all flex items-center justify-center gap-3"
+                >
+                  COMMENCER GRATUITEMENT <ChevronRight className="w-4 h-4" />
+                </button>
+                <button 
+                  onClick={onLogin}
+                  className="w-full sm:w-auto px-6 py-3.5 rounded-2xl text-sm font-black uppercase tracking-widest bg-[#F2AF31] text-slate-900 hover:brightness-105 shadow-xl hover:shadow-2xl hover:scale-105 transition-all flex items-center justify-center gap-3"
+                >
+                  <div className="w-6 h-6 bg-black/10 rounded-full flex items-center justify-center">
+                    <User className="w-3.5 h-3.5 text-slate-900" />
+                  </div>
+                  Accès Partenaire Invité
+                </button>
+                <button 
+                  onClick={() => setIsDemoOpen(true)}
+                  className="w-full sm:w-auto px-6 py-3.5 rounded-2xl text-sm font-black uppercase tracking-widest text-slate-600 hover:bg-slate-50 transition-all flex items-center justify-center gap-3 group"
+                >
+                  <div className="w-8 h-8 bg-slate-100 rounded-full flex items-center justify-center group-hover:bg-indigo-100 transition-colors">
+                    <Play className="w-3.5 h-3.5 text-indigo-600 fill-indigo-600" />
+                  </div>
+                  Voir Démo
+                </button>
+              </div>
             </div>
           </motion.div>
 
@@ -388,15 +399,21 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStart, onLogin, onViewProto
                 transition={{ duration: 1 }}
              >
                 <h2 className="text-4xl md:text-6xl font-black tracking-tighter mb-10 uppercase leading-[0.85]">Prêt pour la <br />guerre des idées ?</h2>
-                <div className="flex flex-col sm:flex-row items-center justify-center gap-6">
+                <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
                   <button 
                     onClick={onStart}
-                    className="w-full sm:w-auto bg-white text-indigo-600 px-12 py-6 rounded-full text-xl font-black uppercase tracking-widest shadow-2xl shadow-white/20 hover:scale-105 transition-all"
+                    className="w-full sm:w-auto bg-white text-indigo-600 px-8 py-4 rounded-full text-base font-black uppercase tracking-widest shadow-2xl shadow-white/20 hover:scale-105 transition-all"
                   >
-                    Essai Gratuit
+                    COMMENCER GRATUITEMENT
                   </button>
-                  <p className="text-indigo-200 text-sm font-bold uppercase tracking-widest">Aucune carte bancaire requise.</p>
+                  <button 
+                    onClick={onLogin}
+                    className="w-full sm:w-auto bg-[#F2AF31] text-slate-900 px-8 py-4 rounded-full text-base font-black uppercase tracking-widest hover:brightness-105 transition-all shadow-xl hover:scale-105 flex items-center justify-center gap-2"
+                  >
+                    <User className="w-5 h-5" /> Lire un Document Invité
+                  </button>
                 </div>
+                <p className="text-indigo-200 text-sm font-bold uppercase tracking-widest mt-6">Aucune carte bancaire requise.</p>
              </motion.div>
              {/* Abs shapes */}
              <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-tr from-white/10 to-transparent pointer-events-none"></div>

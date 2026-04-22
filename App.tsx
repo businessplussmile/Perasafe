@@ -30,11 +30,18 @@ const App: React.FC = () => {
   const { user, profile, loading: authLoading } = useAuth();
   const [showGreeting, setShowGreeting] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>('LANDING');
-  const [documents, setDocuments] = useState<SecureDocument[]>([]);
+  const [ownedDocs, setOwnedDocs] = useState<SecureDocument[]>([]);
+  const [invitedDocs, setInvitedDocs] = useState<SecureDocument[]>([]);
   const [activeDoc, setActiveDoc] = useState<SecureDocument | null>(null);
   const [transitioning, setTransitioning] = useState(false);
   const [docToDelete, setDocToDelete] = useState<string | null>(null);
   const [isSubscriptionModalOpen, setIsSubscriptionModalOpen] = useState(false);
+
+  const documents = useMemo(() => {
+    const combined = [...ownedDocs, ...invitedDocs];
+    const unique = Array.from(new Map(combined.map(d => [d.id, d])).values());
+    return unique.sort((a, b) => b.createdAt - a.createdAt);
+  }, [ownedDocs, invitedDocs]);
 
   // Écran de compte bloqué
   if (profile?.isBlocked) {
@@ -68,50 +75,69 @@ const App: React.FC = () => {
     }
   }, [user]);
 
-  // Synchronisation avec Firestore
-  useEffect(() => {
-    if (user && viewMode === 'LANDING') {
-      setViewMode('USER');
-    }
-  }, [user, viewMode]);
-
+  // Synchronisation avec Firestore et Auto-Routage
   useEffect(() => {
     if (user && profile) {
-      if (!profile.onboardingCompleted && profile.role !== 'ADMIN') {
+      // Redirect incomplete profiles to ONBOARDING
+      if (!profile.onboardingCompleted && profile.role === 'COMPANY_OWNER' && viewMode !== 'ONBOARDING') {
         setViewMode('ONBOARDING');
-      } else if (viewMode === 'ONBOARDING') {
-        setViewMode('USER');
+        return;
+      }
+      
+      // Auto-route to correct interface from public screens based on role
+      if (viewMode === 'LANDING' || viewMode === 'LOGIN') {
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('import') === 'true') {
+          setViewMode('USER');
+        } else {
+          if (profile.role === 'COMPANY_OWNER') {
+            setViewMode('ADMIN');
+          } else if (profile.role === 'ADMIN') {
+            setViewMode('SUBSCRIPTION');
+          } else {
+            setViewMode('USER');
+          }
+        }
       }
     }
   }, [user, profile, viewMode]);
 
   useEffect(() => {
     if (!profile) {
-      setDocuments([]);
+      setOwnedDocs([]);
+      setInvitedDocs([]);
       return;
     }
 
-    let q;
-    if (profile.role === 'COMPANY_OWNER') {
+    let unsubOwned: () => void = () => {};
+    let unsubInvited: () => void = () => {};
+
+    if (profile.role === 'COMPANY_OWNER' || profile.role === 'ADMIN') {
       // Les entreprises voient leurs propres documents
-      q = query(collection(db, 'companies', profile.companyId || 'default', 'documents'));
+      if (profile.companyId) {
+        const qOwned = query(collection(db, 'companies', profile.companyId, 'documents'));
+        unsubOwned = onSnapshot(qOwned, (snapshot) => {
+          setOwnedDocs(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as SecureDocument)));
+        });
+      }
+      
+      // Et les documents où ils sont invités
+      const qInvited = query(collectionGroup(db, 'documents'), where('partnerIds', 'array-contains', profile.email));
+      unsubInvited = onSnapshot(qInvited, (snapshot) => {
+        setInvitedDocs(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as SecureDocument)));
+      });
     } else if (profile.role === 'PARTNER') {
-      // Les partenaires voient les documents où ils sont listés via collectionGroup
-      q = query(collectionGroup(db, 'documents'), where('partnerIds', 'array-contains', profile.email));
-    } else {
-      // ADMIN shouldn't query documents here
-      return;
+      // Les partenaires voient uniquement les documents où ils sont listés
+      const qInvited = query(collectionGroup(db, 'documents'), where('partnerIds', 'array-contains', profile.email));
+      unsubInvited = onSnapshot(qInvited, (snapshot) => {
+        setInvitedDocs(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as SecureDocument)));
+      });
     }
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const docs: SecureDocument[] = snapshot.docs.map(doc => ({
-        ...doc.data(),
-        id: doc.id
-      } as SecureDocument));
-      setDocuments(docs.sort((a, b) => b.createdAt - a.createdAt));
-    });
-
-    return () => unsubscribe();
+    return () => {
+      unsubOwned();
+      unsubInvited();
+    };
   }, [profile]);
 
   // Vérification périodique optimisée de l'expiration
@@ -143,7 +169,7 @@ const App: React.FC = () => {
       setViewMode(mode);
       setTransitioning(false);
       window.scrollTo({ top: 0, behavior: 'auto' });
-    }, 250);
+    }, 100);
   }, [transitioning]);
 
   const handleGreetingComplete = useCallback(() => {
@@ -154,11 +180,16 @@ const App: React.FC = () => {
     if (!profile || profile.role !== 'COMPANY_OWNER') return;
 
     // Vérification de l'abonnement (Nombre de documents)
-    const tier = profile.subscriptionTier || 'STANDARD';
+    const tier = profile.subscriptionTier || 'FREE';
     const docLimit = DOC_LIMITS[tier];
 
     if (documents.length >= docLimit) {
-      alert(`Limite atteinte (${docLimit} document${docLimit > 1 ? 's' : ''}). Passez au niveau supérieur pour ajouter plus de fichiers.`);
+      if (tier === 'FREE') {
+        alert("Vous avez utilisé votre essai gratuit (1 document max). Veuillez souscrire à un abonnement pour continuer.");
+        switchView('SUBSCRIPTION');
+      } else {
+        alert(`Limite atteinte (${docLimit} document${docLimit > 1 ? 's' : ''}). Passez au niveau supérieur pour ajouter plus de fichiers.`);
+      }
       return;
     }
 
@@ -168,11 +199,12 @@ const App: React.FC = () => {
     const storLimit = STORAGE_LIMITS[tier];
 
     if (currentUsage + newDocSize > storLimit) {
-      alert(`Espace de stockage insuffisant. Supprimez des documents pour libérer de l'espace.`);
+      alert(`Espace de stockage insuffisant (${storLimit / (1024*1024)} Mo max pour le plan ${tier}).`);
       return;
     }
 
     const newDocRef = doc(collection(db, 'companies', profile.companyId!, 'documents'));
+    const companyName = profile.onboardingData?.companyName || `Espace de ${profile.name || profile.email}`;
     
     await setDoc(newDocRef, {
       ...docData,
@@ -182,6 +214,7 @@ const App: React.FC = () => {
       isConsumed: false,
       companyId: profile.companyId,
       uploaderId: profile.uid,
+      companyName: companyName,
       partnerIds: docData.partnerIds || [],
       summary: docData.summary || ''
     });
@@ -202,7 +235,8 @@ const App: React.FC = () => {
 
     const now = Date.now();
     
-    if (document.isConsumed || (document.lifespanStart && now - document.lifespanStart >= LIFESPAN_MS)) {
+    const duration = document.validityDuration || LIFESPAN_MS;
+    if (document.isConsumed || (document.lifespanStart && now - document.lifespanStart >= duration)) {
       alert("Ce document a expiré. Contactez l'administrateur.");
       return;
     }
@@ -221,13 +255,16 @@ const App: React.FC = () => {
     if (!profile || profile.role !== 'COMPANY_OWNER') return false;
 
     const document = documents.find(d => d.id === id);
-    if (!document) return false;
+    if (!document || !document.companyId) return false;
+
+    // Strict ownership check
+    if (document.companyId !== profile.companyId) return false;
 
     const originalContent = decryptContent(document.content, document.accessCode);
     if (originalContent.includes("ERREUR DE DÉCHIFFREMENT")) return false;
 
     const newEncryptedContent = encryptContent(originalContent, newCode);
-    const docRef = doc(db, 'companies', profile.companyId!, 'documents', id);
+    const docRef = doc(db, 'companies', document.companyId, 'documents', id);
     
     await updateDoc(docRef, { 
       accessCode: newCode,
@@ -242,21 +279,65 @@ const App: React.FC = () => {
   const toggleDocStatus = useCallback(async (id: string) => {
     if (!profile || profile.role !== 'COMPANY_OWNER') return;
     const document = documents.find(d => d.id === id);
-    if (!document) return;
+    if (!document || !document.companyId) return;
 
-    const docRef = doc(db, 'companies', profile.companyId!, 'documents', id);
+    if (document.companyId !== profile.companyId) return;
+
+    const docRef = doc(db, 'companies', document.companyId, 'documents', id);
     await updateDoc(docRef, { isConsumed: !document.isConsumed });
+  }, [profile, documents]);
+
+  const importDocuments = useCallback(async (docsToImport: SecureDocument[]) => {
+    if (!profile || profile.role !== 'COMPANY_OWNER' || !profile.companyId) return;
+    
+    const tier = profile.subscriptionTier || 'FREE';
+    const docLimit = DOC_LIMITS[tier];
+    const availableSlots = docLimit - documents.length;
+
+    if (availableSlots <= 0) {
+      alert(`Limite atteinte (${docLimit} documents).`);
+      return;
+    }
+
+    const toProcess = docsToImport.slice(0, availableSlots);
+    const companyName = profile.onboardingData?.companyName || `Espace de ${profile.name || profile.email}`;
+    const batchPromises = toProcess.map(docData => {
+      const newDocRef = doc(collection(db, 'companies', profile.companyId!, 'documents'));
+      return setDoc(newDocRef, {
+        ...docData,
+        id: newDocRef.id,
+        createdAt: Date.now(),
+        isConsumed: false,
+        companyId: profile.companyId,
+        uploaderId: profile.uid,
+        companyName: companyName
+      });
+    });
+
+    await Promise.all(batchPromises);
+    if (docsToImport.length > availableSlots) {
+      alert(`Certains documents n'ont pas été importés car la limite de ${docLimit} a été atteinte.`);
+    }
   }, [profile, documents]);
 
   const executeDelete = useCallback(async () => {
     if (!docToDelete || !profile) return;
     
-    const docRef = doc(db, 'companies', profile.companyId!, 'documents', docToDelete);
+    const document = documents.find(d => d.id === docToDelete);
+    if (!document) return;
+
+    // Security check: only owner can delete
+    if (document.companyId !== profile.companyId && profile.role !== 'ADMIN') {
+      alert("Droits insuffisants pour détruire ce package.");
+      return;
+    }
+    
+    const docRef = doc(db, 'companies', document.companyId, 'documents', docToDelete);
     await deleteDoc(docRef);
     
     if (activeDoc?.id === docToDelete) switchView('USER');
     setDocToDelete(null);
-  }, [docToDelete, activeDoc, switchView, profile]);
+  }, [docToDelete, activeDoc, switchView, profile, documents]);
 
   // Calcul du stockage utilisé
   const storageUsage = useMemo(() => {
@@ -286,6 +367,18 @@ const App: React.FC = () => {
     }
   }, [profile]);
 
+  const handleTourComplete = useCallback(async (type: 'admin' | 'user') => {
+    if (!profile) return;
+    try {
+      const userRef = doc(db, 'users', profile.uid);
+      await updateDoc(userRef, {
+        [type === 'admin' ? 'hasSeenAdminTour' : 'hasSeenUserTour']: true
+      });
+    } catch (error) {
+      console.error("Error updating tour status:", error);
+    }
+  }, [profile]);
+
   const handleSignOut = () => {
     signOut();
     switchView('USER');
@@ -293,21 +386,21 @@ const App: React.FC = () => {
 
   const header = useMemo(() => (
     viewMode !== 'VIEWER' && (
-      <header className="glass-light sticky top-0 z-50 px-4 md:px-12 py-4 md:py-5 shadow-sm">
-        <div className="max-w-7xl mx-auto flex justify-between items-center">
-          <div className="flex items-center gap-3 md:gap-5 cursor-pointer btn-active transition-all" onClick={() => switchView('USER')}>
-            <div className="bg-indigo-600 p-2.5 md:p-3 rounded-xl md:rounded-2xl shadow-xl shadow-indigo-600/20">
+      <header className="glass-light sticky top-0 z-50 px-3 md:px-12 py-3 md:py-5 shadow-sm">
+        <div className="max-w-7xl mx-auto flex justify-between items-center gap-1">
+          <div className="flex items-center gap-2 md:gap-5 cursor-pointer btn-active transition-all shrink-0" onClick={() => switchView('USER')}>
+            <div className="bg-indigo-600 p-2 md:p-3 rounded-xl md:rounded-2xl shadow-xl shadow-indigo-600/20">
               < ShieldCheck className="text-white w-5 h-5 md:w-6 md:h-6" />
             </div>
-            <div className="hidden xs:block">
+            <div className="hidden sm:block">
               <span className="text-lg md:text-xl font-black tracking-tighter text-slate-900 uppercase block leading-none">PERASafe</span>
               <span className="text-[8px] md:text-[10px] text-indigo-600 font-bold tracking-[0.2em] md:tracking-[0.3em] uppercase opacity-70">Enterprise Cloud</span>
             </div>
           </div>
           
-          <div className="flex items-center gap-2 md:gap-4">
+          <div className="flex items-center gap-1.5 sm:gap-2 md:gap-4 shrink-0 overflow-x-auto scrollbar-hide py-1">
             {profile && (
-              <div className="hidden lg:flex items-center gap-3 mr-4 px-4 py-2 bg-slate-100 rounded-full border border-slate-200/50">
+              <div className="hidden lg:flex items-center gap-3 mr-4 px-4 py-2 bg-slate-100 rounded-full border border-slate-200/50 shrink-0">
                 <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
                 <span className="text-[9px] font-black text-slate-600 uppercase tracking-widest truncate max-w-[150px]">
                   {profile.email} ({profile.role})
@@ -317,7 +410,7 @@ const App: React.FC = () => {
                     onClick={() => setIsSubscriptionModalOpen(true)}
                     className={`ml-2 px-2 py-0.5 rounded-full text-[8px] font-black uppercase ${(profile.subscriptionTier === 'PRO' || profile.subscriptionTier === 'BUSINESS') ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-200 text-slate-500'}`}
                   >
-                    {profile.subscriptionTier === 'PRO' ? 'PRO' : (profile.subscriptionTier === 'BUSINESS' ? 'BUSINESS' : (profile.subscriptionStatus === 'PENDING' ? 'ATTENTE VAL.' : 'STANDARD'))}
+                    {profile.subscriptionTier === 'PRO' ? 'PRO' : (profile.subscriptionTier === 'BUSINESS' ? 'BUSINESS' : (profile.subscriptionStatus === 'PENDING' ? 'ATTENTE VAL.' : (profile.subscriptionTier === 'FREE' ? 'GRATUIT' : 'STANDARD')))}
                   </button>
                 )}
               </div>
@@ -326,20 +419,20 @@ const App: React.FC = () => {
             {profile?.role === 'ADMIN' && (
               <button 
                 onClick={() => switchView(viewMode === 'SUBSCRIPTION' ? 'USER' : 'SUBSCRIPTION')} 
-                className={`px-4 md:px-6 py-2.5 md:py-3 rounded-xl md:rounded-2xl font-black text-[9px] md:text-[10px] uppercase tracking-widest transition-all btn-active flex items-center gap-2 ${viewMode === 'SUBSCRIPTION' ? 'bg-slate-100 text-slate-600' : 'bg-orange-500 text-white shadow-xl shadow-orange-500/10'}`}
+                className={`px-3 md:px-6 py-2.5 md:py-3 rounded-xl md:rounded-2xl font-black text-[9px] md:text-[10px] uppercase tracking-widest transition-all btn-active flex items-center gap-1.5 md:gap-2 shrink-0 ${viewMode === 'SUBSCRIPTION' ? 'bg-slate-100 text-slate-600' : 'bg-orange-500 text-white shadow-xl shadow-orange-500/10'}`}
               >
-                {viewMode === 'SUBSCRIPTION' ? <Users className="w-3 h-3" /> : <ShieldCheck className="w-3 h-3" />}
-                <span className="hidden md:inline">{viewMode === 'SUBSCRIPTION' ? 'Registre' : 'Console Super-Admin'}</span>
+                {viewMode === 'SUBSCRIPTION' ? <Users className="w-3 h-3 md:w-3.5 md:h-3.5" /> : <ShieldCheck className="w-3 h-3 md:w-3.5 md:h-3.5" />}
+                <span className="hidden sm:inline">{viewMode === 'SUBSCRIPTION' ? 'Registre' : 'Console Super-Admin'}</span>
               </button>
             )}
 
             {profile?.role === 'COMPANY_OWNER' && (
               <button 
                 onClick={() => switchView(viewMode === 'ADMIN' ? 'USER' : 'ADMIN')} 
-                className={`px-4 md:px-6 py-2.5 md:py-3 rounded-xl md:rounded-2xl font-black text-[9px] md:text-[10px] uppercase tracking-widest transition-all btn-active flex items-center gap-2 ${viewMode === 'ADMIN' ? 'bg-slate-100 text-slate-600' : 'bg-indigo-600 text-white shadow-xl shadow-indigo-600/10'}`}
+                className={`px-3 md:px-6 py-2.5 md:py-3 rounded-xl md:rounded-2xl font-black text-[9px] md:text-[10px] uppercase tracking-widest transition-all btn-active flex items-center gap-1.5 md:gap-2 shrink-0 ${viewMode === 'ADMIN' ? 'bg-slate-100 text-slate-600' : 'bg-indigo-600 text-white shadow-xl shadow-indigo-600/10'}`}
               >
-                {viewMode === 'ADMIN' ? <Users className="w-3 h-3" /> : <Settings className="w-3 h-3" />}
-                <span className="hidden md:inline">{viewMode === 'ADMIN' ? 'Registre' : 'Espace Entreprise'}</span>
+                {viewMode === 'ADMIN' ? <Users className="w-3 h-3 md:w-3.5 md:h-3.5" /> : <Settings className="w-3 h-3 md:w-3.5 md:h-3.5" />}
+                <span className="hidden sm:inline">{viewMode === 'ADMIN' ? 'Registre' : 'Espace Entreprise'}</span>
               </button>
             )}
 
@@ -348,10 +441,10 @@ const App: React.FC = () => {
             {user && (
               <button 
                 onClick={handleSignOut} 
-                className="w-10 h-10 md:w-12 md:h-12 flex items-center justify-center rounded-xl md:rounded-2xl bg-red-50 text-red-500 border border-red-100 btn-active transition-all" 
+                className="w-10 h-10 md:w-12 md:h-12 flex items-center justify-center rounded-xl md:rounded-2xl bg-red-50 text-red-500 border border-red-100 btn-active transition-all shrink-0" 
                 title="Déconnexion"
               >
-                <LogOut className="w-4 h-4" />
+                <LogOut className="w-4 h-4 md:w-5 md:h-5" />
               </button>
             )}
           </div>
@@ -362,7 +455,7 @@ const App: React.FC = () => {
 
   const isPublicView = ['LANDING', 'PROTOCOL', 'PRIVACY', 'LOGIN'].includes(viewMode);
 
-  if (authLoading && !isPublicView) {
+  if (authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50">
         <div className="flex flex-col items-center gap-4">
@@ -419,10 +512,17 @@ const App: React.FC = () => {
       
       {/* Product Tour Overlay */}
       {profile && (viewMode === 'ADMIN' || viewMode === 'USER') && (
-        <ProductTour role={profile.role === 'COMPANY_OWNER' ? 'COMPANY_OWNER' : 'PARTNER'} userId={profile.uid} />
+        <ProductTour 
+          role={profile.role === 'COMPANY_OWNER' ? 'COMPANY_OWNER' : 'PARTNER'} 
+          userId={profile.uid} 
+          viewMode={viewMode}
+          hasSeenAdminTour={profile.hasSeenAdminTour}
+          hasSeenUserTour={profile.hasSeenUserTour}
+          onTourComplete={handleTourComplete}
+        />
       )}
 
-      <main className={`flex-1 relative transition-all duration-500 ${transitioning ? 'opacity-0 scale-95 blur-sm' : 'opacity-100 scale-100 blur-0'}`}>
+      <main className={`flex-1 relative transition-all duration-300 ${transitioning ? 'opacity-0 scale-95 blur-sm' : 'opacity-100 scale-100 blur-0'}`}>
         {viewMode === 'USER' && (
           <MemoizedUserDocGrid 
             documents={documents} 
@@ -430,16 +530,17 @@ const App: React.FC = () => {
             isAdmin={profile?.role === 'COMPANY_OWNER'} 
             onDeleteDoc={setDocToDelete} 
             onImportDocuments={() => {}} 
+            currentCompanyId={profile?.companyId}
           />
         )}
           {viewMode === 'ADMIN' && profile?.role === 'COMPANY_OWNER' && (
             <MemoizedAdminPanel 
-              documents={documents} 
+              documents={ownedDocs} 
               profile={profile}
               storageUsage={storageUsage}
               storageLimit={storageLimit}
               onAddDocument={addDocument} 
-              onImportDocuments={() => {}} 
+              onImportDocuments={importDocuments} 
               onUpdateCode={updateDocCode} 
               onToggleStatus={toggleDocStatus} 
               onDeleteDocument={setDocToDelete} 
@@ -463,7 +564,7 @@ const App: React.FC = () => {
           <SecureViewer 
             document={activeDoc} 
             onExit={() => switchView('USER')} 
-            isAdmin={profile?.role === 'COMPANY_OWNER'} 
+            isAdmin={profile?.role === 'COMPANY_OWNER' && activeDoc.companyId === profile.companyId} 
             onDelete={() => setDocToDelete(activeDoc.id)} 
           />
         )}
