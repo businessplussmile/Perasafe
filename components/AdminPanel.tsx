@@ -234,10 +234,60 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ documents, profile, storageUsag
       }
     };
 
+    const handleAgentAction = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      const editor = editorRef.current;
+      if (!editor) return;
+
+      const { command, payload } = customEvent.detail;
+      const currentText = editor.innerText;
+
+      switch(command) {
+        case 'template':
+          editor.innerText = payload;
+          showToast("Mode Argentique : Modèle injecté.", 'success');
+          break;
+        case 'uppercase':
+          editor.innerText = currentText.toUpperCase();
+          showToast("Mode Argentique : Texte mis en majuscules.", 'success');
+          break;
+        case 'lowercase':
+          editor.innerText = currentText.toLowerCase();
+          showToast("Mode Argentique : Texte mis en minuscules.", 'success');
+          break;
+        case 'anonymize':
+          // Redact generic emails and numbers
+          let anonText = currentText.replace(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g, '[EMAIL-MASQUÉ]');
+          anonText = anonText.replace(/(?:(?:\+|00)33|0)[1-9](?:[\s.-]*\d{2}){4}/g, '[TEL-MASQUÉ]');
+          editor.innerText = anonText;
+          showToast("Mode Argentique : Données sensibles caviardées.", 'success');
+          break;
+        case 'clear':
+          editor.innerText = '';
+          showToast("Mode Argentique : Éditeur purgé.", 'success');
+          break;
+        case 'summarize':
+          generateSummary();
+          break;
+        case 'add_partner':
+          setPartnerEmails(prev => prev ? `${prev}, ${payload}` : payload);
+          showToast(`Partenaire ${payload} ajouté.`, 'success');
+          break;
+        case 'remove_partner':
+          setPartnerEmails(prev => prev.split(',').map(e => e.trim()).filter(e => e !== payload).join(', '));
+          showToast(`Partenaire ${payload} retiré.`, 'success');
+          break;
+      }
+      updateStats();
+    };
+
+    window.addEventListener('perasafe:agent', handleAgentAction);
     editor.addEventListener('input', handleInput);
     editor.addEventListener('paste', handlePaste);
     editor.addEventListener('drop', handleDrop);
+    
     return () => {
+      window.removeEventListener('perasafe:agent', handleAgentAction);
       editor.removeEventListener('input', handleInput);
       editor.removeEventListener('paste', handlePaste);
       editor.removeEventListener('drop', handleDrop);
@@ -726,7 +776,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ documents, profile, storageUsag
                 Vider
               </button>
               <button 
-                id="tour-admin-save"
+                id="tour-btn-create-doc"
                 type="submit" 
                 className="flex-1 md:flex-none bg-indigo-600 text-white font-black px-10 py-4 md:py-6 rounded-2xl text-[9px] md:text-[10px] uppercase tracking-widest shadow-lg btn-active transition-all"
               >
@@ -746,6 +796,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ documents, profile, storageUsag
           <div className="flex gap-3 md:gap-4 w-full md:w-auto">
             <input type="file" ref={importFileInputRef} className="hidden" accept=".peravault" onChange={handleImport} />
             <button 
+              id="tour-btn-import"
               onClick={() => importFileInputRef.current?.click()} 
               disabled={profile?.subscriptionTier === 'STANDARD' || profile?.subscriptionTier === 'FREE'}
               className={`flex-1 md:flex-none bg-slate-100 text-slate-600 font-black px-8 py-4 md:py-6 rounded-2xl text-[9px] md:text-[10px] uppercase tracking-widest btn-active transition-all ${(profile?.subscriptionTier === 'STANDARD' || profile?.subscriptionTier === 'FREE' || !profile?.subscriptionTier) ? 'opacity-50 cursor-not-allowed' : ''}`}
@@ -753,6 +804,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ documents, profile, storageUsag
               Importer
             </button>
             <button 
+              id="tour-btn-export-all"
               onClick={() => exportPackage(documents, 'vault-backup')} 
               disabled={profile?.subscriptionTier === 'STANDARD' || profile?.subscriptionTier === 'FREE'}
               className={`flex-1 md:flex-none bg-indigo-600 text-white font-black px-8 py-4 md:py-6 rounded-2xl text-[9px] md:text-[10px] uppercase tracking-widest shadow-lg btn-active transition-all ${(profile?.subscriptionTier === 'STANDARD' || profile?.subscriptionTier === 'FREE' || !profile?.subscriptionTier) ? 'opacity-50 cursor-not-allowed' : ''}`}
@@ -793,6 +845,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ documents, profile, storageUsag
                     </td>
                     <td className="px-8 py-8 text-center">
                       <button 
+                        id={`tour-admin-revoke-${doc.id}`}
                         onClick={() => onToggleStatus(doc.id)} 
                         className={`text-[8px] px-4 py-2 rounded-xl font-black transition-all ${doc.isConsumed ? 'bg-slate-100 text-slate-400' : 'bg-green-50 text-green-700'}`}
                       >
@@ -801,6 +854,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ documents, profile, storageUsag
                     </td>
                     <td className="px-8 py-8 text-right whitespace-nowrap">
                       <button 
+                        id={`tour-admin-share-${doc.id}`}
                         onClick={handleShareLink} 
                         className="text-emerald-500 p-3 hover:bg-emerald-50 rounded-xl transition-all mr-2" 
                         title="Copier le lien partenaire"
@@ -808,14 +862,29 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ documents, profile, storageUsag
                         <i className="fas fa-link text-xs"></i>
                       </button>
                       <button 
+                        id={`tour-admin-modify-${doc.id}`}
                         onClick={() => { setEditingDoc(doc); setNewCodeInput(doc.accessCode); }} 
                         className="text-indigo-600 p-3 hover:bg-indigo-50 rounded-xl transition-all mr-2" 
                         title="Changer le code"
                       >
                         <i className="fas fa-key text-xs"></i>
                       </button>
-                      <button onClick={() => exportPackage([doc], doc.title)} className="text-[#643012] p-3 hover:bg-[#643012]/5 rounded-xl transition-all mr-2" title="Exporter"><i className="fas fa-file-export text-xs"></i></button>
-                      <button onClick={() => onDeleteDocument(doc.id)} className="text-red-200 hover:text-red-600 p-3 hover:bg-red-50 rounded-xl transition-all" title="Supprimer"><i className="fas fa-trash-can text-xs"></i></button>
+                      <button 
+                        id={`tour-admin-export-${doc.id}`}
+                        onClick={() => exportPackage([doc], doc.title)} 
+                        className="text-[#643012] p-3 hover:bg-[#643012]/5 rounded-xl transition-all mr-2" 
+                        title="Exporter"
+                      >
+                        <i className="fas fa-file-export text-xs"></i>
+                      </button>
+                      <button 
+                        id={`tour-admin-delete-${doc.id}`}
+                        onClick={() => onDeleteDocument(doc.id)} 
+                        className="text-red-200 hover:text-red-600 p-3 hover:bg-red-50 rounded-xl transition-all" 
+                        title="Supprimer"
+                      >
+                        <i className="fas fa-trash-can text-xs"></i>
+                      </button>
                     </td>
                   </tr>
                 ))

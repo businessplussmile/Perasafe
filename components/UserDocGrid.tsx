@@ -1,6 +1,7 @@
 
 import React, { useState, useRef } from 'react';
 import { SecureDocument } from '../types';
+import { decryptContent } from '../services/documentService';
 
 interface UserDocGridProps {
   documents: SecureDocument[];
@@ -31,17 +32,38 @@ const UserDocGrid: React.FC<UserDocGridProps> = ({ documents, onOpenDoc, isAdmin
     return false;
   };
 
+  const searchableDocuments = React.useMemo(() => {
+    return documents.map(doc => {
+      if (doc.keywords) return doc;
+      try {
+        return {
+          ...doc,
+          _decryptedContent: decryptContent(doc.content, doc.accessCode).toLowerCase()
+        };
+      } catch (e) {
+        return doc;
+      }
+    });
+  }, [documents]);
+
   const filteredDocuments = React.useMemo(() => {
-    let docs = documents;
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase().trim();
-      docs = documents.filter(doc => 
-        doc.title.toLowerCase().includes(query) || 
-        (doc.summary && doc.summary.toLowerCase().includes(query))
-      );
-    }
-    return docs;
-  }, [documents, searchQuery]);
+    if (!searchQuery.trim()) return searchableDocuments;
+    
+    const query = searchQuery.toLowerCase().trim();
+    return searchableDocuments.filter(doc => {
+      // Search in title
+      if (doc.title.toLowerCase().includes(query)) return true;
+      // Search in summary
+      if (doc.summary && doc.summary.toLowerCase().includes(query)) return true;
+      // Search in keywords (pre-extracted)
+      if (doc.keywords && doc.keywords.some(k => k.toLowerCase().includes(query))) return true;
+      
+      // Fallback to pre-decrypted content for old docs
+      if ((doc as any)._decryptedContent && (doc as any)._decryptedContent.includes(query)) return true;
+      
+      return false;
+    });
+  }, [searchableDocuments, searchQuery]);
 
   const activeDocsCount = documents.filter(d => !isDocExpired(d)).length;
   const expiredDocsCount = documents.filter(d => isDocExpired(d)).length;
@@ -123,7 +145,7 @@ const UserDocGrid: React.FC<UserDocGridProps> = ({ documents, onOpenDoc, isAdmin
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="RECHERCHER PAR TITRE OU RÉSUMÉ..."
+              placeholder="RECHERCHER PAR TITRE, RÉSUMÉ OU MOTS-CLÉS..."
               className="w-full bg-white border-2 border-slate-100 rounded-2xl py-4 pl-12 pr-6 text-[10px] font-black uppercase tracking-widest text-slate-900 focus:border-indigo-600 outline-none shadow-sm transition-all placeholder:text-slate-300"
             />
           </div>
@@ -173,6 +195,7 @@ const UserDocGrid: React.FC<UserDocGridProps> = ({ documents, onOpenDoc, isAdmin
             >
               {isAdmin && onDeleteDoc && doc.companyId === currentCompanyId && (
                 <button 
+                  id={`tour-user-delete-${doc.id}`}
                   onClick={(e) => { e.stopPropagation(); onDeleteDoc(doc.id); }}
                   className="absolute top-4 right-4 md:top-6 md:right-6 w-9 h-9 md:w-10 md:h-10 rounded-xl bg-red-50 text-red-500 sm:opacity-0 group-hover:opacity-100 transition-all hover:bg-red-500 hover:text-white z-10 flex items-center justify-center btn-active"
                 >
@@ -180,9 +203,10 @@ const UserDocGrid: React.FC<UserDocGridProps> = ({ documents, onOpenDoc, isAdmin
                 </button>
               )}
 
-              <div 
+              <button 
+                id={`tour-user-open-${doc.id}`}
                 onClick={() => !expired && setSelectedDoc(doc)}
-                className="relative h-full"
+                className="relative h-full w-full text-left bg-transparent border-none appearance-none cursor-pointer"
               >
                 <div className={`w-12 h-12 md:w-16 md:h-16 rounded-2xl md:rounded-[1.5rem] flex items-center justify-center mb-5 md:mb-10 transition-all ${
                   expired ? 'bg-slate-200 text-slate-400' : 'bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white'
@@ -210,7 +234,7 @@ const UserDocGrid: React.FC<UserDocGridProps> = ({ documents, onOpenDoc, isAdmin
                     </p>
                   )}
                 </div>
-              </div>
+              </button>
             </div>
             );
           })

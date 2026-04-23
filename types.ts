@@ -46,6 +46,7 @@ export interface SecureDocument {
   summary?: string;
   validityDuration?: number; // In milliseconds
   companyName?: string;
+  keywords?: string[];
 }
 
 export type ViewMode = 'LANDING' | 'USER' | 'ADMIN' | 'VIEWER' | 'LOGIN' | 'ONBOARDING' | 'SUBSCRIPTION' | 'PROTOCOL' | 'PRIVACY';

@@ -63,6 +63,7 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ profile }) => {
   return (
     <div className="relative">
       <button 
+        id="tour-btn-notifications"
         onClick={() => setIsOpen(!isOpen)}
         className="relative w-10 h-10 md:w-12 md:h-12 flex items-center justify-center rounded-xl md:rounded-2xl bg-white border border-slate-200 text-slate-400 hover:text-indigo-600 hover:border-indigo-100 transition-all shadow-sm"
       >

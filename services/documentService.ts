@@ -93,3 +93,28 @@ export const getFileMetadata = (fileName: string, fileSize: number) => {
 export const processLocalDocument = (content: string): string => {
   return content.replace(/[\u0000-\u0008\u000B-\u000C\u000E-\u001F]/g, "");
 };
+
+/**
+ * Extrait les mots-clés significatifs d'un contenu textuel (HTML ou brut)
+ */
+export const extractKeywords = (content: string): string[] => {
+  if (!content) return [];
+  
+  // 1. Nettoyage HTML si présent
+  const plainText = content.replace(/<[^>]*>?/gm, ' ');
+  
+  // 2. Normalisation et extraction des mots de plus de 3 lettres
+  const words = plainText.toLowerCase().match(/[a-z0-9àâçéèêëîïôûùw-]{4,}/g) || [];
+  
+  // 3. Filtrage des mots vides courants (Stop words)
+  const stopWords = new Set([
+    'dans', 'pour', 'avec', 'votre', 'cette', 'nous', 'vous', 'leur', 'leurs', 
+    'mais', 'donc', 'elle', 'elles', 'notre', 'plus', 'tout', 'tous', 'fait', 
+    'faire', 'était', 'étaient', 'quand', 'comme', 'aussi', 'bien', 'très'
+  ]);
+  
+  const uniqueWords = Array.from(new Set(words)).filter(w => !stopWords.has(w));
+  
+  // 4. Retourne les 40 mots-clés les plus pertinents (ici on prend les premiers uniques)
+  return uniqueWords.slice(0, 40);
+};

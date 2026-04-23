@@ -14,8 +14,74 @@ import ProductTour from './components/ProductTour';
 import ProtocolPage from './components/ProtocolPage';
 import PrivacyPolicy from './components/PrivacyPolicy';
 import NotificationBell from './components/NotificationBell';
-import { encryptContent, decryptContent, summarizeDocument } from './services/documentService';
+import HelpAssistant from './components/HelpAssistant';
+import { encryptContent, decryptContent, summarizeDocument, extractKeywords } from './services/documentService';
 import { useAuth } from './hooks/useAuth';
+import { motion, AnimatePresence } from 'motion/react';
+
+const HighlightOverlay = () => {
+    const [target, setTarget] = useState<{ top: number; left: number; width: number; height: number } | null>(null);
+    const [isVisible, setIsVisible] = useState(false);
+
+    useEffect(() => {
+        const handleHighlight = (e: any) => {
+            const id = e.detail.id;
+            const element = document.getElementById(id);
+            if (element) {
+                // Scroll first to ensure visibility
+                element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                
+                // Wait for scroll to stabilize before measuring
+                setTimeout(() => {
+                    const rect = element.getBoundingClientRect();
+                    const scrollY = window.scrollY || window.pageYOffset;
+                    const scrollX = window.scrollX || window.pageXOffset;
+                    
+                    setTarget({
+                        top: rect.top + scrollY,
+                        left: rect.left + scrollX,
+                        width: rect.width,
+                        height: rect.height
+                    });
+                    setIsVisible(true);
+                    
+                    // Auto-hide after 5 seconds
+                    setTimeout(() => setIsVisible(false), 5000);
+                }, 600);
+            }
+        };
+        window.addEventListener('perasafe:highlight', handleHighlight as EventListener);
+        return () => window.removeEventListener('perasafe:highlight', handleHighlight as EventListener);
+    }, []);
+
+    if (!isVisible || !target) return null;
+
+    return (
+        <AnimatePresence>
+          {isVisible && (
+            <motion.div
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 1.1 }}
+                className="absolute z-[9999] pointer-events-none"
+                style={{
+                    top: target.top - 10,
+                    left: target.left - 10,
+                    width: target.width + 20,
+                    height: target.height + 20,
+                    border: '4px solid #4f46e5',
+                    borderRadius: '16px',
+                    boxShadow: '0 0 0 9999px rgba(0,0,0,0.5), 0 0 40px rgba(79,70,229,0.9)',
+                }}
+            >
+              <div className="absolute -top-12 left-1/2 -translate-x-1/2 bg-indigo-600 text-white text-[10px] font-black uppercase tracking-widest px-4 py-2 rounded-full shadow-2xl whitespace-nowrap">
+                Action Identifiée
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+    );
+};
 import { db, signOut } from './services/firebaseService';
 import { collection, query, where, onSnapshot, doc, updateDoc, deleteDoc, setDoc, addDoc, serverTimestamp, getDoc, collectionGroup } from 'firebase/firestore';
 import { LogOut, ShieldCheck, Settings, Users, PieChart, CreditCard, ChevronRight, Bell, Search, Plus, CheckCircle2, Ban } from 'lucide-react';
@@ -36,6 +102,7 @@ const App: React.FC = () => {
   const [transitioning, setTransitioning] = useState(false);
   const [docToDelete, setDocToDelete] = useState<string | null>(null);
   const [isSubscriptionModalOpen, setIsSubscriptionModalOpen] = useState(false);
+  const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [appNotification, setAppNotification] = useState<{
     title: string;
     message: string;
@@ -145,9 +212,50 @@ const App: React.FC = () => {
       });
     }
 
+    const handleGlobalAgent = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      const { command, targetName } = customEvent.detail;
+
+      if (command === 'delete_document') {
+        const target = targetName?.toLowerCase() || '';
+
+        setOwnedDocs((currentOwnedDocs) => {
+           if (currentOwnedDocs.length > 0) {
+             let docToTarget = null;
+             
+             if (target) {
+               // Recherche par substring, insensible à la casse sur le champ 'title'
+               docToTarget = currentOwnedDocs.find(d => d.title?.toLowerCase().includes(target));
+             }
+             
+             if (!docToTarget && !target) {
+               // Comportement par défaut : le document le plus récent
+               const sortedDocs = [...currentOwnedDocs].sort((a, b) => (b.createdAt as any) - (a.createdAt as any));
+               docToTarget = sortedDocs[0];
+             }
+
+             if (docToTarget) {
+               setDocToDelete(docToTarget.id);
+               notifyEvent("Action Argentique", "Destruction Demandée", `L'Agent a ciblé le document "${docToTarget.title || 'Sans titre'}" pour destruction. Veuillez confirmer manuellement.`);
+             } else {
+               notifyEvent("Action Argentique", "Cible Introuvable", `L'Agent n'a pas pu identifier de document nommé "${target}" dans votre Registre.`);
+             }
+           } else {
+             notifyEvent("Action Argentique", "Erreur d'Exécution", "L'Agent n'a trouvé aucun document à détruire dans votre Registre.");
+           }
+           return currentOwnedDocs;
+        });
+      } else if (command === 'panic') {
+        signOut();
+      }
+    };
+
+    window.addEventListener('perasafe:agent_global', handleGlobalAgent);
+
     return () => {
       unsubOwned();
       unsubInvited();
+      window.removeEventListener('perasafe:agent_global', handleGlobalAgent);
     };
   }, [profile]);
 
@@ -244,7 +352,8 @@ const App: React.FC = () => {
       uploaderId: profile.uid,
       companyName: companyName,
       partnerIds: docData.partnerIds || [],
-      summary: docData.summary || ''
+      summary: docData.summary || '',
+      keywords: extractKeywords(docData.content)
     });
   }, [profile, documents]);
 
@@ -345,6 +454,18 @@ const App: React.FC = () => {
     const companyName = profile.onboardingData?.companyName || `Espace de ${profile.name || profile.email}`;
     const batchPromises = toProcess.map(docData => {
       const newDocRef = doc(collection(db, 'companies', profile.companyId!, 'documents'));
+      
+      // Essayer d'extraire les mots-clés s'ils manquent (nécessite le déchiffrement temporaire)
+      let keywords = docData.keywords;
+      if (!keywords && docData.content && docData.accessCode) {
+        try {
+          const plain = decryptContent(docData.content, docData.accessCode);
+          keywords = extractKeywords(plain);
+        } catch (e) {
+          console.warn("Keyword extraction failed during import", e);
+        }
+      }
+
       return setDoc(newDocRef, {
         ...docData,
         id: newDocRef.id,
@@ -352,7 +473,8 @@ const App: React.FC = () => {
         isConsumed: false,
         companyId: profile.companyId,
         uploaderId: profile.uid,
-        companyName: companyName
+        companyName: companyName,
+        keywords: keywords || []
       });
     });
 
@@ -467,6 +589,7 @@ const App: React.FC = () => {
                 </span>
                 {profile.role === 'COMPANY_OWNER' && (
                   <button 
+                    id="tour-btn-stats"
                     onClick={() => setIsSubscriptionModalOpen(true)}
                     className={`ml-2 px-2 py-0.5 rounded-full text-[8px] font-black uppercase ${(profile.subscriptionTier === 'PRO' || profile.subscriptionTier === 'BUSINESS') ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-200 text-slate-500'}`}
                   >
@@ -488,11 +611,23 @@ const App: React.FC = () => {
 
             {profile?.role === 'COMPANY_OWNER' && (
               <button 
+                id="tour-btn-nav-admin"
                 onClick={() => switchView(viewMode === 'ADMIN' ? 'USER' : 'ADMIN')} 
                 className={`px-3 md:px-6 py-2.5 md:py-3 rounded-xl md:rounded-2xl font-black text-[9px] md:text-[10px] uppercase tracking-widest transition-all btn-active flex items-center gap-1.5 md:gap-2 shrink-0 ${viewMode === 'ADMIN' ? 'bg-slate-100 text-slate-600' : 'bg-indigo-600 text-white shadow-xl shadow-indigo-600/10'}`}
               >
-                {viewMode === 'ADMIN' ? <Users className="w-3 h-3 md:w-3.5 md:h-3.5" /> : <Settings className="w-3 h-3 md:w-3.5 md:h-3.5" />}
+                {viewMode === 'ADMIN' ? <Users id="tour-icon-registre" className="w-3 h-3 md:w-3.5 md:h-3.5" /> : <Settings id="tour-icon-admin" className="w-3 h-3 md:w-3.5 md:h-3.5" />}
                 <span className="hidden sm:inline">{viewMode === 'ADMIN' ? 'Registre' : 'Espace Entreprise'}</span>
+              </button>
+            )}
+
+            {user && (
+              <button 
+                id="tour-btn-help"
+                onClick={() => setIsHelpOpen(true)}
+                className="w-10 h-10 md:w-12 md:h-12 flex items-center justify-center rounded-xl md:rounded-2xl bg-indigo-50 text-indigo-600 border border-indigo-100 btn-active transition-all shrink-0 hover:bg-indigo-100" 
+                title="Besoin d'aide ?"
+              >
+                <div className="font-black font-mono text-lg">?</div>
               </button>
             )}
 
@@ -500,6 +635,7 @@ const App: React.FC = () => {
 
             {user && (
               <button 
+                id="tour-btn-logout"
                 onClick={handleSignOut} 
                 className="w-10 h-10 md:w-12 md:h-12 flex items-center justify-center rounded-xl md:rounded-2xl bg-red-50 text-red-500 border border-red-100 btn-active transition-all shrink-0" 
                 title="Déconnexion"
@@ -572,6 +708,7 @@ const App: React.FC = () => {
   return (
     <div className="relative min-h-screen flex flex-col selection:bg-indigo-100 bg-[#f8fafc]">
       {header}
+      <HighlightOverlay />
       
       {/* Product Tour Overlay */}
       {profile && (viewMode === 'ADMIN' || viewMode === 'USER') && (
@@ -735,6 +872,21 @@ const App: React.FC = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Help Assistant */}
+      {user && profile && (
+        <HelpAssistant 
+          isOpen={isHelpOpen}
+          onClose={() => setIsHelpOpen(false)}
+          onNavigate={(view) => setViewMode(view as ViewMode)}
+          onLogout={handleSignOut}
+          userRole={profile.role}
+          subscriptionTier={profile.subscriptionTier}
+          documents={documents}
+          storageUsage={storageUsage}
+          storageLimit={storageLimit}
+        />
       )}
 
       {/* Global Smart Notification */}

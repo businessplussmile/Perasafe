@@ -142,6 +142,7 @@ const ProductTour: React.FC<ProductTourProps> = ({ role, userId, viewMode, hasSe
       icon: 'fa-shield-halved',
       content: 'Ici, vous pouvez rédiger votre contenu confidentiel. Il sera chiffré localement avant d\'être sauvegardé.',
       placement: 'bottom',
+      disableBeacon: true,
     },
     {
       target: '#tour-admin-settings',
@@ -149,6 +150,7 @@ const ProductTour: React.FC<ProductTourProps> = ({ role, userId, viewMode, hasSe
       icon: 'fa-sliders',
       content: 'Configurez les accès : adresses emails des partenaires, durée d\'expiration autorisée, et le code secret unique.',
       placement: 'top',
+      disableBeacon: true,
     },
     {
       target: '#tour-admin-save',
@@ -156,6 +158,7 @@ const ProductTour: React.FC<ProductTourProps> = ({ role, userId, viewMode, hasSe
       icon: 'fa-lock',
       content: 'Une fois terminé, cliquez ici pour chiffrer et stocker le document au sein de votre coffre.',
       placement: 'bottom',
+      disableBeacon: true,
     },
     {
       target: '#tour-admin-inventory',
@@ -163,6 +166,7 @@ const ProductTour: React.FC<ProductTourProps> = ({ role, userId, viewMode, hasSe
       icon: 'fa-vault',
       content: 'Retrouvez vos documents ici. Vous pouvez gérer leurs codes, les exporter en .peravault ou copier le lien sécurisé pour les partenaires.',
       placement: 'top',
+      disableBeacon: true,
     }
   ];
 
@@ -181,6 +185,7 @@ const ProductTour: React.FC<ProductTourProps> = ({ role, userId, viewMode, hasSe
       icon: 'fa-file-import',
       content: 'Pour consulter un fichier .peravault reçu (ou via le presse-papiers), c\'est ici que ça se passe.',
       placement: 'bottom',
+      disableBeacon: true,
     },
     {
       target: '#tour-user-vault',
@@ -188,6 +193,7 @@ const ProductTour: React.FC<ProductTourProps> = ({ role, userId, viewMode, hasSe
       icon: 'fa-eye',
       content: 'Vos documents déverrouillés et chiffrés apparaîtront ici. Entrez le code secret pour les visualiser. Attention à l\'auto-destruction !',
       placement: 'top',
+      disableBeacon: true,
     }
   ];
 
@@ -201,12 +207,17 @@ const ProductTour: React.FC<ProductTourProps> = ({ role, userId, viewMode, hasSe
       run={run}
       continuous={true}
       scrollToFirstStep={true}
+      disableBeacon={true}
       callback={handleJoyrideCallback}
       tooltipComponent={CustomTooltip}
       styles={{
         options: {
           zIndex: 10000,
           overlayColor: 'rgba(15, 23, 42, 0.75)',
+          primaryColor: '#4f46e5',
+        },
+        beacon: {
+          display: 'none',
         }
       }}
     />

@@ -12,13 +12,20 @@ const LoginPortal: React.FC<LoginPortalProps> = ({ onBack }) => {
   const [errorMessage, setErrorMessage] = useState('');
 
   const handleGoogleLogin = async () => {
+    if (status === 'scanning') return;
     setStatus('scanning');
     setErrorMessage('');
     try {
       await signInWithGoogle();
-    } catch (error) {
+    } catch (error: any) {
       setStatus('error');
-      setErrorMessage("Échec de la connexion Google.");
+      if (error && error.code === 'auth/popup-closed-by-user') {
+        setErrorMessage("L'authentification a été annulée. Veuillez réessayer.");
+      } else if (error && error.code === 'auth/network-request-failed') {
+        setErrorMessage("Problème de connexion réseau. Veuillez vérifier votre accès à Internet.");
+      } else {
+        setErrorMessage("Échec de la connexion Google.");
+      }
     } finally {
       setStatus('idle');
     }
