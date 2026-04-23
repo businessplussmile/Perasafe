@@ -36,6 +36,17 @@ const App: React.FC = () => {
   const [transitioning, setTransitioning] = useState(false);
   const [docToDelete, setDocToDelete] = useState<string | null>(null);
   const [isSubscriptionModalOpen, setIsSubscriptionModalOpen] = useState(false);
+  const [appNotification, setAppNotification] = useState<{
+    title: string;
+    message: string;
+    solution?: string;
+    actionBtn?: string;
+    onAction?: () => void;
+  } | null>(null);
+
+  const notifyEvent = useCallback((title: string, message: string, solution?: string, actionBtn?: string, onAction?: () => void) => {
+    setAppNotification({ title, message, solution, actionBtn, onAction });
+  }, []);
 
   const documents = useMemo(() => {
     const combined = [...ownedDocs, ...invitedDocs];
@@ -185,10 +196,21 @@ const App: React.FC = () => {
 
     if (documents.length >= docLimit) {
       if (tier === 'FREE') {
-        alert("Vous avez utilisé votre essai gratuit (1 document max). Veuillez souscrire à un abonnement pour continuer.");
-        switchView('SUBSCRIPTION');
+        notifyEvent(
+          "Quota de création atteint",
+          `Vous avez atteint la limite de votre forfait ${tier} (${docLimit} document maximum).`,
+          "Passez à un forfait supérieur pour ajouter plus de fichiers et bénéficier de fonctionnalités avancées.",
+          "Voir les offres",
+          () => switchView('SUBSCRIPTION')
+        );
       } else {
-        alert(`Limite atteinte (${docLimit} document${docLimit > 1 ? 's' : ''}). Passez au niveau supérieur pour ajouter plus de fichiers.`);
+        notifyEvent(
+          "Limite de documents atteinte",
+          `Votre forfait actuel vous limite à ${docLimit} document${docLimit > 1 ? 's' : ''}.`,
+          "Améliorez votre infrastructure cloud en passant au niveau supérieur.",
+          "Améliorer l'offre",
+          () => switchView('SUBSCRIPTION')
+        );
       }
       return;
     }
@@ -199,7 +221,13 @@ const App: React.FC = () => {
     const storLimit = STORAGE_LIMITS[tier];
 
     if (currentUsage + newDocSize > storLimit) {
-      alert(`Espace de stockage insuffisant (${storLimit / (1024*1024)} Mo max pour le plan ${tier}).`);
+      notifyEvent(
+        "Stockage insuffisant",
+        `L'espace restant est insuffisant pour finaliser le chiffrement (Volume actuel : ${storLimit / (1024*1024)} Mo max).`,
+        "Supprimez vos anciens documents pour libérer de l'espace ou souscrivez à une offre PRO/BUSINESS.",
+        "Gérer l'espace",
+        () => switchView('SUBSCRIPTION')
+      );
       return;
     }
 
@@ -229,7 +257,11 @@ const App: React.FC = () => {
     const isSuperAdmin = profile.role === 'ADMIN';
 
     if (!isOwner && !isPartner && !isSuperAdmin) {
-      alert("Accès Refusé. Votre identité numérique n'est pas associée à ce pack de données.");
+      notifyEvent(
+        "Accès Réfusé",
+        "Votre identité numérique n'est pas associée à ce package de données chiffrées.",
+        "Demandez à l'administrateur ou au propriétaire de l'entreprise de vous ajouter comme partenaire sur ce document."
+      );
       return;
     }
 
@@ -237,7 +269,11 @@ const App: React.FC = () => {
     
     const duration = document.validityDuration || LIFESPAN_MS;
     if (document.isConsumed || (document.lifespanStart && now - document.lifespanStart >= duration)) {
-      alert("Ce document a expiré. Contactez l'administrateur.");
+      notifyEvent(
+        "Cycle de vie terminé",
+        "Ce document a expiré et n'est plus accessible selon les paramètres de sécurité définis.",
+        "Contactez l'administrateur du document pour un nouvel accès ou un nouveau lien sécurisé."
+      );
       return;
     }
 
@@ -295,7 +331,13 @@ const App: React.FC = () => {
     const availableSlots = docLimit - documents.length;
 
     if (availableSlots <= 0) {
-      alert(`Limite atteinte (${docLimit} documents).`);
+      notifyEvent(
+        "Capacité maximale atteinte",
+        `Votre espace sécurisé ne peut contenir que ${docLimit} documents simultanément.`,
+        "Passez à un abonnement supérieur pour accroître votre volume de stockage.",
+        "Voir les offres",
+        () => setIsSubscriptionModalOpen(true)
+      );
       return;
     }
 
@@ -316,7 +358,13 @@ const App: React.FC = () => {
 
     await Promise.all(batchPromises);
     if (docsToImport.length > availableSlots) {
-      alert(`Certains documents n'ont pas été importés car la limite de ${docLimit} a été atteinte.`);
+      notifyEvent(
+        "Importation partielle",
+        `Certains documents ont été bloqués car la limite de ${docLimit} documents a été atteinte.`,
+        "Libérez de l'espace ou passez à une offre supérieure pour importer le reste de vos données sécurisées.",
+        "Améliorer l'offre",
+        () => setIsSubscriptionModalOpen(true)
+      );
     }
   }, [profile, documents]);
 
@@ -328,7 +376,11 @@ const App: React.FC = () => {
 
     // Security check: only owner can delete
     if (document.companyId !== profile.companyId && profile.role !== 'ADMIN') {
-      alert("Droits insuffisants pour détruire ce package.");
+      notifyEvent(
+        "Opération non autorisée",
+        "Vous ne disposez pas des privilèges administratifs requis pour détruire cette archive.",
+        "Demandez au propriétaire initial (l'auteur du document) d'effectuer cette destruction."
+      );
       return;
     }
     
@@ -359,11 +411,19 @@ const App: React.FC = () => {
         requestedTier: tier
       });
       
-      alert(`Demande pour le plan ${tier} transmise. Validation en cours par l'admin.`);
+      notifyEvent(
+        "Demande d'évolution enregistrée",
+        `Votre requête pour l'accès au niveau ${tier} a été transmise avec succès.`,
+        "Notre équipe d'administration est en cours d'analyse de votre dossier. L'activation sera automatique."
+      );
       setIsSubscriptionModalOpen(false);
     } catch (error) {
       console.error("Upgrade request error:", error);
-      alert("Erreur lors de la demande.");
+      notifyEvent(
+        "Erreur de communication",
+        "Impossible de finaliser votre demande d'évolution vers nos serveurs.",
+        "Veuillez vérifier votre connexion réseau et réessayer ultérieurement."
+      );
     }
   }, [profile]);
 
@@ -534,6 +594,7 @@ const App: React.FC = () => {
             onDeleteDoc={setDocToDelete} 
             onImportDocuments={() => {}} 
             currentCompanyId={profile?.companyId}
+            onNotifyEvent={notifyEvent}
           />
         )}
           {viewMode === 'ADMIN' && profile?.role === 'COMPANY_OWNER' && (
@@ -546,6 +607,7 @@ const App: React.FC = () => {
               onImportDocuments={importDocuments} 
               onUpdateCode={updateDocCode} 
               onUpgrade={() => setIsSubscriptionModalOpen(true)}
+              onNotifyEvent={notifyEvent}
               onToggleStatus={toggleDocStatus} 
               onDeleteDocument={setDocToDelete} 
             />
@@ -670,6 +732,52 @@ const App: React.FC = () => {
             <div className="flex flex-col gap-3">
               <button onClick={executeDelete} className="w-full bg-red-600 text-white font-black py-4 rounded-2xl shadow-xl shadow-red-600/20 btn-active">Confirmer</button>
               <button onClick={() => setDocToDelete(null)} className="w-full bg-slate-100 text-slate-500 font-bold py-3 rounded-2xl text-[9px] uppercase tracking-widest">Annuler</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Global Smart Notification */}
+      {appNotification && (
+        <div className="fixed inset-0 z-[500] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white w-full max-w-md rounded-[2.5rem] p-8 shadow-2xl border border-slate-100 relative animate-modal-in flex flex-col">
+            <button 
+              onClick={() => setAppNotification(null)}
+              className="absolute top-6 right-6 w-8 h-8 flex items-center justify-center bg-slate-100 text-slate-500 rounded-full hover:bg-slate-200 transition-colors"
+            >
+              <i className="fas fa-times"></i>
+            </button>
+            <div className="w-16 h-16 bg-orange-50 text-orange-500 rounded-2xl flex items-center justify-center mb-6 shadow-inner">
+              <i className="fas fa-exclamation-triangle text-2xl"></i>
+            </div>
+            <h3 className="text-xl font-black text-slate-900 uppercase tracking-tighter mb-2">{appNotification.title}</h3>
+            <p className="text-sm font-medium text-slate-600 leading-relaxed mb-6">{appNotification.message}</p>
+            
+            {appNotification.solution && (
+              <div className="bg-indigo-50 border border-indigo-100 rounded-2xl p-4 mb-6">
+                <span className="text-[9px] font-black text-indigo-600 uppercase tracking-widest block mb-2">Solution recommandée</span>
+                <p className="text-xs font-bold text-slate-700 leading-relaxed">{appNotification.solution}</p>
+              </div>
+            )}
+            
+            <div className="flex flex-col gap-3 mt-auto">
+              {appNotification.actionBtn && appNotification.onAction && (
+                <button 
+                  onClick={() => {
+                    appNotification.onAction!();
+                    setAppNotification(null);
+                  }} 
+                  className="w-full bg-indigo-600 text-white font-black py-4 rounded-2xl text-[10px] uppercase tracking-widest shadow-xl shadow-indigo-600/20 hover:scale-[1.02] transition-all"
+                >
+                  {appNotification.actionBtn}
+                </button>
+              )}
+              <button 
+                onClick={() => setAppNotification(null)} 
+                className="w-full bg-slate-100 text-slate-600 font-black py-4 rounded-2xl text-[10px] uppercase tracking-widest hover:bg-slate-200 transition-all"
+              >
+                Fermer
+              </button>
             </div>
           </div>
         </div>

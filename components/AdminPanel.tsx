@@ -17,6 +17,7 @@ interface AdminPanelProps {
   onToggleStatus: (id: string) => void;
   onDeleteDocument: (id: string) => void;
   onUpgrade?: () => void;
+  onNotifyEvent?: (title: string, message: string, solution?: string, actionBtn?: string, onAction?: () => void) => void;
 }
 
 const SIGNATURE = "PERADOC-SIG-X14";
@@ -48,7 +49,7 @@ const COLORS = [
   { label: 'Vert', value: '#16a34a' }
 ];
 
-const AdminPanel: React.FC<AdminPanelProps> = ({ documents, profile, storageUsage, storageLimit, onAddDocument, onImportDocuments, onUpdateCode, onToggleStatus, onDeleteDocument, onUpgrade }) => {
+const AdminPanel: React.FC<AdminPanelProps> = ({ documents, profile, storageUsage, storageLimit, onAddDocument, onImportDocuments, onUpdateCode, onToggleStatus, onDeleteDocument, onUpgrade, onNotifyEvent }) => {
   const [title, setTitle] = useState('');
   const [code, setCode] = useState('');
   const [isFullScreen, setIsFullScreen] = useState(false);
@@ -101,13 +102,21 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ documents, profile, storageUsag
         URL.revokeObjectURL(url);
       }, 100);
     } catch (e) {
-      showToast("Échec de l'exportation.", 'error');
+      if (onNotifyEvent) {
+        onNotifyEvent("Erreur d'exportation", "Impossible de compiler le package de sécurité (.peravault).", "Veuillez réessayer. Si le problème persiste, rafraîchissez la page.");
+      } else {
+        showToast("Échec de l'exportation.", 'error');
+      }
     }
   };
 
   const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (profile?.subscriptionTier === 'STANDARD' || profile?.subscriptionTier === 'FREE' || !profile?.subscriptionTier) {
-      showToast("L'importation groupée est réservée aux abonnements PRO et BUSINESS.", 'error');
+      if (onNotifyEvent) {
+        onNotifyEvent("Importation bloquée", "L'importation groupée de sauvegardes est une fonctionnalité premium.", "Mettez à niveau votre pack vers PRO ou BUSINESS pour restaurer vos archives.", "Mettre à niveau", onUpgrade);
+      } else {
+        showToast("L'importation groupée est réservée aux abonnements PRO et BUSINESS.", 'error');
+      }
       return;
     }
     const file = e.target.files?.[0];
@@ -124,7 +133,11 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ documents, profile, storageUsag
         onImportDocuments(Array.isArray(data.payload) ? data.payload : [data.payload]);
         showToast("Importation réussie.");
       } catch (err) {
-        showToast("Fichier corrompu ou invalide.", 'error');
+        if (onNotifyEvent) {
+          onNotifyEvent("Archive invalide", "Le fichier sélectionné est corrompu ou falsifié.", "Assurez-vous qu'il s'agit bien d'un fichier .peravault original et non modifié.");
+        } else {
+          showToast("Fichier corrompu ou invalide.", 'error');
+        }
       }
     };
     reader.readAsText(file);
@@ -165,11 +178,10 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ documents, profile, storageUsag
         for (let i = 0; i < items.length; i++) {
           if (items[i].type.indexOf('image') !== -1) {
             e.preventDefault();
-            const msg = "Le copier-coller d'images est réservé aux abonnements PRO et BUSINESS. Cliquez ici pour améliorer votre offre.";
-            showToast(msg, 'error');
-            if (onUpgrade) {
-              // Optionnel: on peut aussi rediriger direct au clic sur le toast si on avait un toast custom
-              // Ici on va juste utiliser le toast existant pour informer
+            if (onNotifyEvent) {
+              onNotifyEvent("Action Bloquée", "Le copier-coller d'images est réservé aux abonnements PRO et BUSINESS.", "Cette fonction nécessite un serveur dédié. Mettez à niveau votre offre pour l'activer.", "Améliorer l'offre", onUpgrade);
+            } else {
+              showToast("Le copier-coller d'images est réservé aux abonnements PRO et BUSINESS.", 'error');
             }
             return;
           }
@@ -179,7 +191,11 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ documents, profile, storageUsag
       // 2. Check HTML content (images from web pages)
       if (html && html.toLowerCase().includes('<img')) {
         e.preventDefault();
-        showToast("L'insertion d'images via HTML est réservée aux abonnements PRO et BUSINESS. Cliquez ici pour voir nos offres.", 'error');
+        if (onNotifyEvent) {
+          onNotifyEvent("Insertion Interdite", "L'insertion d'images via HTML est réservée aux abonnements PRO et BUSINESS.", "Souscrivez à un plan supérieur pour enrichir vos documents avec des contenus multimédias.", "Voir les plans", onUpgrade);
+        } else {
+          showToast("L'insertion d'images via HTML est réservée aux abonnements PRO et BUSINESS.", 'error');
+        }
         return;
       }
     };
@@ -196,7 +212,11 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ documents, profile, storageUsag
         for (let i = 0; i < files.length; i++) {
           if (files[i].type.startsWith('image/')) {
             e.preventDefault();
-            showToast("Le glisser-déposer d'images est réservé aux abonnements PRO et BUSINESS. Cliquez ici pour évoluer.", 'error');
+            if (onNotifyEvent) {
+              onNotifyEvent("Action Bloquée", "Le glisser-déposer d'images est réservé aux abonnements PRO et BUSINESS.", "Mettez à niveau votre offre pour héberger des images chiffrées.", "Évoluer", onUpgrade);
+            } else {
+              showToast("Le glisser-déposer d'images est réservé aux abonnements PRO et BUSINESS.", 'error');
+            }
             return;
           }
         }
@@ -205,7 +225,11 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ documents, profile, storageUsag
       // 2. Check HTML drop (images from other tabs)
       if (html && html.toLowerCase().includes('<img')) {
         e.preventDefault();
-        showToast("Le transfert d'images est réservé aux abonnements PRO et BUSINESS. Cliquez ici pour voir les plans.", 'error');
+        if (onNotifyEvent) {
+          onNotifyEvent("Transfert Interdit", "Le transfert d'images est réservé aux abonnements PRO et BUSINESS.", "Améliorez votre infrastructure cloud.", "Voir les offres", onUpgrade);
+        } else {
+          showToast("Le transfert d'images est réservé aux abonnements PRO et BUSINESS.", 'error');
+        }
         return;
       }
     };
@@ -237,14 +261,22 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ documents, profile, storageUsag
     e.preventDefault();
     const content = editorRef.current?.innerHTML || '';
     if (!title || !content || !code) {
-      showToast("Veuillez remplir tous les champs.", 'error');
+      if (onNotifyEvent) {
+        onNotifyEvent("Champs manquants", "Vous n'avez pas rempli tous les champs obligatoires du document.", "Veuillez vérifier que le titre, le corps du document et le code d'accès sont bien renseignés avant de valider.");
+      } else {
+        showToast("Veuillez remplir tous les champs.", 'error');
+      }
       return;
     }
     
     const partnerIds = partnerEmails.split(',').map(email => email.trim()).filter(email => email !== '');
     
     if (partnerIds.length === 0) {
-      showToast("Veuillez inviter au moins un partenaire.", 'error');
+      if (onNotifyEvent) {
+        onNotifyEvent("Partenaire manquant", "Le document est chiffré mais aucun destinataire n'est configuré.", "Veuillez entrer au moins l'adresse email d'un partenaire avec qui partager ce document.");
+      } else {
+        showToast("Veuillez inviter au moins un partenaire.", 'error');
+      }
       return;
     }
     
@@ -253,7 +285,17 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ documents, profile, storageUsag
     const limit = PARTNER_LIMITS[tier];
     
     if (partnerIds.length > limit) {
-      showToast(`Votre forfait ${tier} limite les partenaires à ${limit} par document.`, 'error');
+      if (onNotifyEvent) {
+        onNotifyEvent(
+          "Limite d'audience atteinte", 
+          `Votre forfait actuel (${tier}) vous limite à un maximum de ${limit} partenaire(s) par document.`, 
+          "Réduisez la liste des personnes invitées ou améliorez votre abonnement pour un partage illimité.",
+          "Voir les offres",
+          onUpgrade
+        );
+      } else {
+        showToast(`Votre forfait ${tier} limite les partenaires à ${limit} par document.`, 'error');
+      }
       return;
     }
 
@@ -267,7 +309,11 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ documents, profile, storageUsag
     if (!file || !profile) return;
 
     if (profile.subscriptionTier === 'STANDARD' || profile.subscriptionTier === 'FREE' || !profile.subscriptionTier) {
-      showToast("L'ajout d'images est réservé aux abonnements PRO et BUSINESS.", 'error');
+      if (onNotifyEvent) {
+        onNotifyEvent("Fonctionnalité Verrouillée", "L'importation de médias riches (Images) est une fonctionnalité premium.", "Passez aux abonnements PRO ou BUSINESS pour bénéficier de l'optimisation et la sécurisation d'images AES-256.", "Améliorer l'offre", onUpgrade);
+      } else {
+        showToast("L'ajout d'images est réservé aux abonnements PRO et BUSINESS.", 'error');
+      }
       return;
     }
 
@@ -297,7 +343,11 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ documents, profile, storageUsag
       showToast('Média optimisé (165 Ko max).', 'success');
     } catch (error) {
       console.error(error);
-      showToast("Erreur lors de l'optimisation média.", 'error');
+      if (onNotifyEvent) {
+        onNotifyEvent("Erreur de compression", "Le moteur n'a pas pu optimiser et chiffrer cette image.", "Vérifiez que le format de l'image est supporté (PNG, JPG) et réessayez.");
+      } else {
+        showToast("Erreur lors de l'optimisation média.", 'error');
+      }
     } finally {
       setIsUploadingImage(false);
       e.target.value = '';
@@ -306,13 +356,21 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ documents, profile, storageUsag
 
   const generateSummary = async () => {
     if (profile?.subscriptionTier === 'STANDARD' || profile?.subscriptionTier === 'FREE' || !profile?.subscriptionTier) {
-      showToast("La synthèse stratégique IA est réservée aux abonnements PRO et BUSINESS.", 'error');
+      if (onNotifyEvent) {
+        onNotifyEvent("Accès Restreint", "La synthèse stratégique par Intelligence Artificielle est désactivée sur votre formule.", "Le moteur d'indexation et de synthèse automatique est exclusif aux plans PRO et BUSINESS.", "Découvrir PRO", onUpgrade);
+      } else {
+        showToast("La synthèse stratégique IA est réservée aux abonnements PRO et BUSINESS.", 'error');
+      }
       return;
     }
     
     const content = editorRef.current?.innerText || '';
     if (!content || content.length < 50) {
-      showToast("Contenu trop court pour l'analyse.", 'error');
+      if (onNotifyEvent) {
+        onNotifyEvent("Volume insuffisant", "La quantité de texte actuel est trop faible pour déclencher une analyse pertinente.", "Rédigez d'abord le coeur de votre document (au moins 50 caractères) avant de lancer la synthèse.");
+      } else {
+        showToast("Contenu trop court pour l'analyse.", 'error');
+      }
       return;
     }
     setIsSummarizing(true);
@@ -321,7 +379,11 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ documents, profile, storageUsag
       setDocSummary(summary);
       showToast("Synthèse stratégique générée.");
     } catch (error) {
-      showToast("Erreur lors de l'analyse.", 'error');
+      if (onNotifyEvent) {
+        onNotifyEvent("Analyse échouée", "Le service d'Intelligence Artificielle est actuellement indisponible ou surchargé.", "Veuillez patienter quelques instants et réessayer votre analyse.");
+      } else {
+        showToast("Erreur lors de l'analyse.", 'error');
+      }
     } finally {
       setIsSummarizing(false);
     }
@@ -344,7 +406,11 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ documents, profile, storageUsag
       setEditingDoc(null);
       setNewCodeInput('');
     } else {
-      showToast("Erreur lors de la mise à jour.", 'error');
+      if (onNotifyEvent) {
+        onNotifyEvent("Échec de la rotation", "Impossible de mettre à jour le code d'accès de ce document.", "Le système a détecté une anomalie de chiffrement ou un problème de réseau. Réessayez ou vérifiez votre connexion.");
+      } else {
+        showToast("Erreur lors de la mise à jour.", 'error');
+      }
     }
   };
 

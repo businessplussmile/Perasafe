@@ -9,11 +9,12 @@ interface UserDocGridProps {
   onDeleteDoc?: (id: string) => void;
   onImportDocuments?: (docs: SecureDocument[]) => void;
   currentCompanyId?: string;
+  onNotifyEvent?: (title: string, message: string, solution?: string) => void;
 }
 
 const SIGNATURE = "PERADOC-SIG-X14";
 
-const UserDocGrid: React.FC<UserDocGridProps> = ({ documents, onOpenDoc, isAdmin, onDeleteDoc, onImportDocuments, currentCompanyId }) => {
+const UserDocGrid: React.FC<UserDocGridProps> = ({ documents, onOpenDoc, isAdmin, onDeleteDoc, onImportDocuments, currentCompanyId, onNotifyEvent }) => {
   const [selectedDoc, setSelectedDoc] = useState<SecureDocument | null>(null);
   const [inputCode, setInputCode] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
@@ -73,9 +74,17 @@ const UserDocGrid: React.FC<UserDocGridProps> = ({ documents, onOpenDoc, isAdmin
         const data = JSON.parse(jsonStr);
         if (data.signature !== SIGNATURE) throw new Error("Invalid Sig");
         onImportDocuments(Array.isArray(data.payload) ? data.payload : [data.payload]);
-        setTimeout(() => alert(`Succès de l'injection.`), 300);
+        if (onNotifyEvent) {
+          onNotifyEvent("Injection réussie", "Les documents sécurisés ont été ajoutés à votre espace personnel avec succès.");
+        } else {
+          setTimeout(() => alert(`Succès de l'injection.`), 300);
+        }
       } catch (err) {
-        alert("Fichier non reconnu.");
+        if (onNotifyEvent) {
+          onNotifyEvent("Package non reconnu", "Le système n'a pas pu vérifier la signature de sécurité du fichier.", "Veuillez vous assurer qu'il s'agit d'un fichier .peravault valide généré par la plateforme.");
+        } else {
+          alert("Fichier non reconnu.");
+        }
       }
     };
     reader.readAsText(file);
