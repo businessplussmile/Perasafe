@@ -67,7 +67,7 @@ service cloud.firestore {
                         incoming().email == existing().email &&
                         (incoming().role == existing().role || (existing().role == 'COMPANY_OWNER' && incoming().role == 'PARTNER')) && 
                         !('isBlocked' in incoming()) && 
-                        incoming().diff(existing()).affectedKeys().hasOnly(['name', 'companyId', 'subscriptionStatus', 'requestedTier', 'onboardingData', 'onboardingCompleted', 'subscriptionTier', 'subscriptionExpiresAt', 'role', 'hasSeenAdminTour', 'hasSeenUserTour']) &&
+                        incoming().diff(existing()).affectedKeys().hasOnly(['name', 'companyId', 'subscriptionStatus', 'requestedTier', 'onboardingData', 'onboardingSurvey', 'onboardingCompleted', 'subscriptionTier', 'subscriptionExpiresAt', 'role', 'hasSeenAdminTour', 'hasSeenUserTour']) &&
                         // Logic guards for self-updates
                         (incoming().subscriptionStatus in ['NONE', 'PENDING'] || (incoming().role == 'PARTNER' && incoming().subscriptionStatus == 'ACTIVE') || (incoming().subscriptionStatus == 'ACTIVE' && incoming().subscriptionTier == 'FREE') || isAdmin())
                        ) || isAdmin()
@@ -108,7 +108,8 @@ service cloud.firestore {
       allow list: if isValidId(companyId) && (isCompanyOwner() || isAdmin());
 
       function isValidDoc(data) {
-        let tier = getUserData(request.auth.uid).subscriptionTier;
+        let userDoc = get(/databases/$(database)/documents/users/$(request.auth.uid));
+        let tier = userDoc.data.subscriptionTier;
         let limit = (tier == 'BUSINESS') ? 100 : (tier == 'PRO' ? 10 : 1);
         
         return data.keys().hasAll(['id', 'title', 'content', 'accessCode', 'companyId', 'createdAt', 'uploaderId']) &&
@@ -117,12 +118,14 @@ service cloud.firestore {
                data.content is string && data.content.size() <= 1048576 &&
                data.accessCode is string && data.accessCode.size() <= 256 &&
                data.companyId == companyId &&
-               data.uploaderId == request.auth.uid &&
+               // Allow owner to update even if they weren't the original uploader (e.g. admin upload)
+               (data.uploaderId == request.auth.uid || isCompanyOwner() || isAdmin()) &&
                data.partnerIds is list && data.partnerIds.size() > 0 && data.partnerIds.size() <= limit &&
                data.createdAt is number &&
                (!('lifespanStart' in data) || data.lifespanStart == null || data.lifespanStart is number) &&
                (!('lastCodeUsedAtOpening' in data) || data.lastCodeUsedAtOpening == null || data.lastCodeUsedAtOpening is string) &&
-               (!('validityDuration' in data) || data.validityDuration is number);
+               (!('validityDuration' in data) || data.validityDuration is number) &&
+               (!('isBlocked' in data) || data.isBlocked is bool);
       }
 
       allow create: if canAccess() && isValidId(companyId) && isValidId(docId) && isCompanyOwner() && isValidDoc(incoming());
@@ -143,8 +146,8 @@ service cloud.firestore {
                           incoming().id == existing().id &&
                           incoming().companyId == existing().companyId &&
                           incoming().createdAt == existing().createdAt &&
-                          incoming().uploaderId == existing().uploaderId &&
-                          incoming().diff(existing()).affectedKeys().hasOnly(['title', 'content', 'accessCode', 'isConsumed', 'partnerIds', 'lifespanStart', 'lastCodeUsedAtOpening', 'validityDuration'])
+                          // Removed uploaderId immutability check to allow owner management of all docs in their company
+                          incoming().diff(existing()).affectedKeys().hasOnly(['title', 'content', 'accessCode', 'isConsumed', 'partnerIds', 'lifespanStart', 'lastCodeUsedAtOpening', 'validityDuration', 'isBlocked'])
                          )
                        );
 
@@ -177,7 +180,13 @@ service cloud.firestore {
     // 4. Secure List Queries for Partners (Collection Group)
     match /{path=**}/documents/{docId} {
       // Allows collectionGroup queries like: db.collectionGroup('documents').where('partnerIds', 'array-contains', userEmail)
-      allow list: if canAccess() && request.auth.token.email in resource.data.partnerIds;
+      allow list: if canAccess() && (request.auth.token.email in resource.data.partnerIds || isAdmin());
+    }
+
+    // 6. System Settings
+    match /system/settings {
+      allow read: if true;
+      allow write: if isAdmin();
     }
   }
 }

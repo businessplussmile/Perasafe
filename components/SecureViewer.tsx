@@ -28,6 +28,8 @@ const DECRYPTION_STEPS = [
 
 const SecureViewer: React.FC<SecureViewerProps> = ({ document: doc, readerProfile, onExit, isAdmin, onDelete }) => {
   const [timeLeft, setTimeLeft] = useState(() => {
+    const isOwnerInit = readerProfile?.uid === doc.uploaderId || (readerProfile?.role === 'COMPANY_OWNER' && readerProfile?.companyId === doc.companyId) || readerProfile?.role === 'SUPER_ADMIN';
+    if (isOwnerInit) return Infinity;
     const start = doc.lifespanStart || Date.now();
     const elapsed = Date.now() - start;
     const duration = doc.validityDuration || LIFESPAN_MS;
@@ -68,7 +70,14 @@ const SecureViewer: React.FC<SecureViewerProps> = ({ document: doc, readerProfil
       }
     }, 80); // Shorter interval
 
+    const isOwner = readerProfile?.uid === doc.uploaderId || (readerProfile?.role === 'COMPANY_OWNER' && readerProfile?.companyId === doc.companyId) || readerProfile?.role === 'SUPER_ADMIN';
+
     const timer = setInterval(() => {
+      if (isOwner) {
+        setTimeLeft(Infinity);
+        return;
+      }
+      
       const start = doc.lifespanStart || Date.now();
       const elapsed = Date.now() - start;
       const duration = doc.validityDuration || LIFESPAN_MS;
@@ -175,10 +184,16 @@ const SecureViewer: React.FC<SecureViewerProps> = ({ document: doc, readerProfil
         </div>
         <div className="flex items-center gap-6">
            <div className="flex flex-col items-end">
-             <span className="text-[7px] md:text-[8px] font-black text-slate-400 uppercase tracking-widest text-red-500 animate-pulse">Auto-Destruction dans</span>
-             <p className={`font-mono text-lg md:text-xl font-black ${timeLeft < 3600 ? 'text-red-600' : 'text-slate-900'}`}>
-                {hours.toString().padStart(2, '0')}:{minutes.toString().padStart(2, '0')}:{seconds.toString().padStart(2, '0')}
-             </p>
+             <span className="text-[7px] md:text-[8px] font-black text-slate-400 uppercase tracking-widest text-red-500 animate-pulse">Auto-Destruction</span>
+             {timeLeft === Infinity ? (
+                <p className="font-mono text-xs md:text-sm font-black text-slate-500 uppercase">
+                  (Propriétaire - Pas de limite)
+                </p>
+             ) : (
+                <p className={`font-mono text-lg md:text-xl font-black ${timeLeft < 3600 ? 'text-red-600' : 'text-slate-900'}`}>
+                  {hours.toString().padStart(2, '0')}:{minutes.toString().padStart(2, '0')}:{seconds.toString().padStart(2, '0')}
+                </p>
+             )}
            </div>
         </div>
       </header>
@@ -233,11 +248,11 @@ const SecureViewer: React.FC<SecureViewerProps> = ({ document: doc, readerProfil
         <div id="secure-document-content" className={`w-full relative transition-all duration-500 ${isBlurred ? 'filter blur-[50px] opacity-0 scale-105 pointer-events-none' : leakDetected ? 'opacity-0 scale-95 pointer-events-none' : 'filter blur-0 scale-100 opacity-100'}`}>
           <div className="relative bg-white min-h-screen shadow-2xl p-0 flex flex-col relative overflow-hidden">
              
-             <div className="absolute inset-0 pointer-events-none select-none opacity-20 z-50 overflow-hidden mix-blend-multiply flex items-center justify-center">
-                <div className="w-[300%] h-[300%] flex flex-wrap gap-12 justify-center items-center -rotate-[30deg]">
-                   {Array.from({ length: 300 }).map((_, i) => (
-                      <span key={i} className="text-slate-500/30 font-black text-xl uppercase tracking-widest whitespace-nowrap">
-                         {readerProfile?.email} - DO NOT SHARE
+             <div className="absolute inset-0 pointer-events-none select-none opacity-[0.05] z-50 overflow-hidden mix-blend-multiply flex items-center justify-center">
+                <div className="w-[300%] h-[300%] flex flex-wrap gap-24 justify-center items-center -rotate-[30deg]">
+                   {Array.from({ length: 150 }).map((_, i) => (
+                      <span key={i} className="text-slate-500 font-black text-xl md:text-2xl uppercase tracking-widest whitespace-nowrap">
+                         {readerProfile?.email} - PROPRIÉTÉ DE {doc.companyName ? doc.companyName.toUpperCase() : "L'ENTREPRISE"}
                       </span>
                    ))}
                 </div>
@@ -254,7 +269,7 @@ const SecureViewer: React.FC<SecureViewerProps> = ({ document: doc, readerProfil
 
                    <div className="max-w-4xl text-center">
                       <p className="text-[#8fa1b4] text-[9px] md:text-[11px] font-bold uppercase tracking-[0.15em] leading-[1.8] opacity-80">
-                         CE DOCUMENT EST LA PROPRIÉTÉ EXCLUSIVE DE PERAFIND. TOUTE REPRODUCTION OU DIVULGATION CONSTITUE UNE FAUTE GRAVE.
+                         CE DOCUMENT EST LA PROPRIÉTÉ EXCLUSIVE DE {doc.companyName ? doc.companyName.toUpperCase() : "L'ENTREPRISE"}. TOUTE REPRODUCTION OU DIVULGATION CONSTITUE UNE FAUTE GRAVE.
                       </p>
                    </div>
 

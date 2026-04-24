@@ -1,11 +1,12 @@
 
-import React, { useRef, useState, useEffect } from 'react';
-import { motion, useScroll, useTransform, useSpring } from 'motion/react';
+import React, { useRef, useEffect } from 'react';
+import { motion, useScroll, useTransform, useSpring, useMotionValue } from 'motion/react';
 import { Shield, Lock, Fingerprint, Eye, Database, Zap } from 'lucide-react';
 
 const ParallaxSecuritySpace: React.FC = () => {
   const containerRef = useRef<HTMLDivElement>(null);
-  const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+  const mouseXProgress = useMotionValue(0.5);
+  const mouseYProgress = useMotionValue(0.5);
 
   // Scroll Parallax
   const { scrollYProgress } = useScroll({
@@ -21,18 +22,19 @@ const ParallaxSecuritySpace: React.FC = () => {
     const handleMouseMove = (e: MouseEvent) => {
       if (!containerRef.current) return;
       const rect = containerRef.current.getBoundingClientRect();
-      const x = (e.clientX - rect.left) / rect.width - 0.5;
-      const y = (e.clientY - rect.top) / rect.height - 0.5;
-      setMousePos({ x, y });
+      const x = (e.clientX - rect.left) / rect.width;
+      const y = (e.clientY - rect.top) / rect.height;
+      mouseXProgress.set(x - 0.5);
+      mouseYProgress.set(y - 0.5);
     };
 
     window.addEventListener('mousemove', handleMouseMove);
     return () => window.removeEventListener('mousemove', handleMouseMove);
-  }, []);
+  }, [mouseXProgress, mouseYProgress]);
 
-  const springConfig = { damping: 25, stiffness: 150 };
-  const mouseX = useSpring(mousePos.x, springConfig);
-  const mouseY = useSpring(mousePos.y, springConfig);
+  const springConfig = { damping: 30, stiffness: 200 };
+  const mouseX = useSpring(mouseXProgress, springConfig);
+  const mouseY = useSpring(mouseYProgress, springConfig);
 
   // Layers movement
   const layer1X = useTransform(mouseX, (x) => x * 15);

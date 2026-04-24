@@ -24,6 +24,7 @@ const UserDocGrid: React.FC<UserDocGridProps> = ({ documents, onOpenDoc, isAdmin
   const importFileInputRef = useRef<HTMLInputElement>(null);
 
   const isDocExpired = (doc: SecureDocument) => {
+    if (isAdmin) return false; // Never expired for owner/admin
     if (doc.isConsumed) return true;
     if (doc.lifespanStart) {
       const now = Date.now();
@@ -186,13 +187,16 @@ const UserDocGrid: React.FC<UserDocGridProps> = ({ documents, onOpenDoc, isAdmin
         ) : (
           filteredDocuments.map(doc => {
             const expired = isDocExpired(doc);
+            const blocked = doc.isBlocked;
             return (
             <div 
               key={doc.id}
               className={`group relative rounded-[2rem] md:rounded-[3rem] p-6 md:p-10 transition-all duration-500 border-2 ${
-                expired 
-                  ? 'bg-slate-50 border-slate-100 cursor-not-allowed grayscale opacity-50' 
-                  : 'bg-white border-white hover:border-indigo-600/30 cursor-pointer shadow-md hover:shadow-xl'
+                blocked 
+                  ? 'bg-red-50 border-red-200 cursor-not-allowed opacity-80' 
+                  : expired 
+                    ? 'bg-slate-50 border-slate-100 cursor-not-allowed grayscale opacity-50' 
+                    : 'bg-white border-white hover:border-indigo-600/30 cursor-pointer shadow-md hover:shadow-xl'
               }`}
             >
               {isAdmin && onDeleteDoc && doc.companyId === currentCompanyId && (
@@ -207,23 +211,30 @@ const UserDocGrid: React.FC<UserDocGridProps> = ({ documents, onOpenDoc, isAdmin
 
               <button 
                 id={`tour-user-open-${doc.id}`}
-                onClick={() => !expired && setSelectedDoc(doc)}
+                onClick={() => !expired && !blocked && setSelectedDoc(doc)}
                 className="relative h-full w-full text-left bg-transparent border-none appearance-none cursor-pointer"
+                disabled={blocked || expired}
               >
                 <div className={`w-12 h-12 md:w-16 md:h-16 rounded-2xl md:rounded-[1.5rem] flex items-center justify-center mb-5 md:mb-10 transition-all ${
-                  expired ? 'bg-slate-200 text-slate-400' : 'bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white'
+                  blocked ? 'bg-red-200 text-red-600' : expired ? 'bg-slate-200 text-slate-400' : 'bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white'
                 }`}>
-                  <i className={`fas ${expired ? 'fa-vault' : 'fa-box-archive'} text-lg md:text-2xl`}></i>
+                  <i className={`fas ${blocked ? 'fa-ban' : expired ? 'fa-vault' : 'fa-box-archive'} text-lg md:text-2xl`}></i>
                 </div>
                 <div className="space-y-1.5 md:space-y-2">
                   <h3 className="text-base md:text-xl font-black text-slate-800 truncate uppercase tracking-tight">{doc.title}</h3>
                   <div className="flex flex-wrap items-center gap-2">
-                    <span 
-                      className="text-[7px] md:text-[8px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full inline-block"
-                      style={!expired ? { backgroundColor: '#F2AF31', color: '#643012' } : { backgroundColor: '#e2e8f0', color: '#64748b' }}
-                    >
-                      {expired ? 'ARCHIVÉ / EXPIRÉ' : 'SECRET D\'ENTREPRISE'}
-                    </span>
+                    {blocked ? (
+                      <span className="text-[7px] md:text-[8px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full inline-block bg-red-600 text-white shadow-sm shadow-red-600/20">
+                        ACCÈS BLOQUÉ
+                      </span>
+                    ) : (
+                      <span 
+                        className="text-[7px] md:text-[8px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full inline-block"
+                        style={!expired ? { backgroundColor: '#F2AF31', color: '#643012' } : { backgroundColor: '#e2e8f0', color: '#64748b' }}
+                      >
+                        {expired ? 'ARCHIVÉ / EXPIRÉ' : 'SECRET D\'ENTREPRISE'}
+                      </span>
+                    )}
                     {doc.companyName && (
                       <span className="text-[7px] md:text-[8px] font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full uppercase truncate max-w-[120px]">
                         {doc.companyName}

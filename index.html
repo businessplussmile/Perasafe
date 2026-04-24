@@ -37,6 +37,11 @@
             --bg-main: #f8fafc;
         }
 
+        #root {
+            position: relative;
+            min-height: 100vh;
+        }
+
         * {
             -webkit-tap-highlight-color: transparent;
             -webkit-font-smoothing: antialiased;
@@ -53,10 +58,10 @@
         }
 
         /* Masquer la barre de défilement pour tous les navigateurs */
-        body::-webkit-scrollbar, .no-scrollbar::-webkit-scrollbar {
+        html::-webkit-scrollbar, body::-webkit-scrollbar, .no-scrollbar::-webkit-scrollbar {
             display: none;
         }
-        body, .no-scrollbar {
+        html, body, .no-scrollbar {
             -ms-overflow-style: none;  /* IE and Edge */
             scrollbar-width: none;  /* Firefox */
         }

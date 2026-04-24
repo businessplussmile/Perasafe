@@ -1,8 +1,50 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { db } from '../services/firebaseService';
-import { collection, query, onSnapshot, doc, updateDoc, getDocs, deleteDoc, writeBatch } from 'firebase/firestore';
+import { collection, query, onSnapshot, doc, updateDoc, setDoc, getDocs, deleteDoc, writeBatch } from 'firebase/firestore';
 import { UserProfile } from '../types';
-import { CheckCircle, XCircle, Clock, User, Mail, Shield, Users as UsersIcon, Ban, Trash2, Calendar, RefreshCcw, AlertTriangle } from 'lucide-react';
+import { CheckCircle, XCircle, Clock, User, Mail, Shield, Users as UsersIcon, Ban, Trash2, Calendar, RefreshCcw, AlertTriangle, FolderOpen } from 'lucide-react';
+import UserDocumentsModal from './UserDocumentsModal';
+
+const resizeImage = (file: File): Promise<string> => {
+   return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+         const img = new Image();
+         img.onload = () => {
+             const canvas = document.createElement('canvas');
+             let width = img.width;
+             let height = img.height;
+             const MAX_DIMENSION = 800;
+
+             if (width > height) {
+                 if (width > MAX_DIMENSION) {
+                     height = Math.round(height * (MAX_DIMENSION / width));
+                     width = MAX_DIMENSION;
+                 }
+             } else {
+                 if (height > MAX_DIMENSION) {
+                     width = Math.round(width * (MAX_DIMENSION / height));
+                     height = MAX_DIMENSION;
+                 }
+             }
+
+             canvas.width = width;
+             canvas.height = height;
+             const ctx = canvas.getContext('2d');
+             if (ctx) {
+                 ctx.drawImage(img, 0, 0, width, height);
+                 resolve(canvas.toDataURL('image/jpeg', 0.8));
+             } else {
+                 resolve(e.target?.result as string);
+             }
+         };
+         img.onerror = () => reject(new Error('Image processing failed'));
+         img.src = e.target?.result as string;
+      };
+      reader.onerror = () => reject(new Error('File reading failed'));
+      reader.readAsDataURL(file);
+   });
+};
 
 interface ConfirmDialogState {
   isOpen: boolean;
@@ -20,6 +62,9 @@ const SuperAdminPanel: React.FC = () => {
   const [purging, setPurging] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<{message: string, type: 'success'|'error'} | null>(null);
   const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState>({ isOpen: false, title: '', message: '', onConfirm: () => {} });
+  const [systemSettings, setSystemSettings] = useState<any>({});
+  const [savingSettings, setSavingSettings] = useState(false);
+  const [selectedUserForDocs, setSelectedUserForDocs] = useState<UserProfile | null>(null);
 
   const showToast = (message: string, type: 'success'|'error' = 'success') => {
     setToastMessage({message, type});
@@ -66,7 +111,16 @@ const SuperAdminPanel: React.FC = () => {
       setPartnerCounts(counts);
     });
 
-    return () => unsubscribe();
+    const settingsUnsubscribe = onSnapshot(doc(db, 'system', 'settings'), (docSnap) => {
+      if (docSnap.exists()) {
+        setSystemSettings(docSnap.data());
+      }
+    });
+
+    return () => {
+      unsubscribe();
+      settingsUnsubscribe();
+    };
   }, []);
 
   const pendingUsers = useMemo(() => allUsers.filter(u => u.subscriptionStatus === 'PENDING'), [allUsers]);
@@ -266,6 +320,36 @@ const SuperAdminPanel: React.FC = () => {
     });
   };
 
+  const updateSetting = async (keyPath: string, value: any) => {
+    try {
+      setSavingSettings(true);
+      const settingsRef = doc(db, 'system', 'settings');
+      let newData = { ...systemSettings };
+      
+      const parts = keyPath.split('.');
+      if (parts.length === 2) {
+        if (!newData[parts[0]]) newData[parts[0]] = {};
+        newData[parts[0]][parts[1]] = value;
+      } else {
+        newData[keyPath] = value;
+      }
+
+      await updateDoc(settingsRef, newData).catch(err => {
+         // Create if not exists
+         if (err.code === 'not-found') {
+            return setDoc(settingsRef, newData);
+         }
+         throw err;
+      });
+      showToast(`Paramètre mis à jour avec succès.`);
+    } catch (error) {
+       console.error("Update settings error:", error);
+       showToast("Erreur lors de la mise à jour du paramètre.", "error");
+    } finally {
+      setSavingSettings(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center p-20">
@@ -375,6 +459,7 @@ const SuperAdminPanel: React.FC = () => {
                           {u.onboardingData && (
                             <div className="flex flex-col gap-1 mt-2">
                               <span className="text-[10px] font-bold text-slate-700 flex items-center gap-1"><i className="fas fa-building text-[8px] text-slate-400"></i> {u.onboardingData.companyName}</span>
+                              {u.onboardingData.jobTitle && <span className="text-[10px] text-slate-500 font-bold">{u.onboardingData.jobTitle}</span>}
                               <span className="text-[10px] text-slate-500">{u.onboardingData.sector}</span>
                               <span className="text-[10px] text-slate-500">{u.onboardingData.phone}</span>
                             </div>
@@ -527,6 +612,13 @@ const SuperAdminPanel: React.FC = () => {
 
                           <div className="flex gap-2">
                             <button 
+                              onClick={() => setSelectedUserForDocs(u)}
+                              className="w-9 h-9 flex items-center justify-center bg-indigo-50 text-indigo-600 rounded-xl hover:bg-indigo-600 hover:text-white transition-all shadow-sm"
+                              title="Gérer les documents"
+                            >
+                              <FolderOpen className="w-4 h-4" />
+                            </button>
+                            <button 
                               onClick={() => toggleBlockUser(u)}
                               className={`w-9 h-9 flex items-center justify-center rounded-xl transition-all shadow-sm ${u.isBlocked ? 'bg-indigo-600 text-white hover:bg-indigo-700' : 'bg-slate-100 text-slate-600 hover:bg-red-50 hover:text-red-600'}`}
                               title={u.isBlocked ? "Débloquer" : "Bloquer l'accès"}
@@ -550,7 +642,106 @@ const SuperAdminPanel: React.FC = () => {
             </table>
           </div>
         </div>
+
+        {/* Global Configurations */}
+        <div className="bg-white rounded-[2.5rem] shadow-xl border border-slate-100 overflow-hidden mt-8">
+          <div className="p-8 border-b border-slate-50 flex justify-between items-center text-center flex-wrap gap-4">
+            <h2 className="text-sm font-black text-slate-900 uppercase tracking-widest flex items-center gap-3">
+              <Shield className="w-4 h-4 text-indigo-500" /> Configuration du site (Landing Page)
+            </h2>
+          </div>
+          <div className="p-8 grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div className="bg-slate-50 rounded-2xl p-6 border border-slate-100">
+               <h3 className="text-xs font-black uppercase tracking-widest mb-4">Bloc Blanc (Architecture)</h3>
+               <div className="space-y-4">
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block mb-2">Image URL</label>
+                    <input 
+                      type="text" 
+                      className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" 
+                      value={systemSettings?.landingImages?.whiteBlockUrl || ''} 
+                      onChange={(e) => updateSetting('landingImages.whiteBlockUrl', e.target.value)} 
+                      placeholder="https://..."
+                    />
+                  </div>
+                  <div>
+                     <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block mb-2 pb-2">Ou envoyer un fichier (max 1Mo)</label>
+                     <input 
+                        type="file" 
+                        accept="image/*"
+                        className="text-xs w-full"
+                        onChange={async (e) => {
+                           const file = e.target.files?.[0];
+                           if (!file) return;
+                           try {
+                              const resizedUrl = await resizeImage(file);
+                              updateSetting('landingImages.whiteBlockUrl', resizedUrl);
+                           } catch (err) {
+                              showToast("Erreur de traitement d'image", "error");
+                           }
+                        }}
+                     />
+                  </div>
+                  {systemSettings?.landingImages?.whiteBlockUrl && (
+                     <div className="mt-4 border border-slate-200 rounded-lg p-2 bg-white">
+                        <img src={systemSettings.landingImages.whiteBlockUrl} alt="Preview White" className="h-20 object-contain" />
+                        <button onClick={() => updateSetting('landingImages.whiteBlockUrl', '')} className="text-[10px] text-red-500 mt-2 hover:underline">Supprimer</button>
+                     </div>
+                  )}
+               </div>
+            </div>
+
+            <div className="bg-slate-900 rounded-2xl p-6 border border-slate-800 text-white">
+               <h3 className="text-xs font-black uppercase tracking-widest mb-4">Bloc Noir (Architecture)</h3>
+               <div className="space-y-4">
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-2">Image URL</label>
+                    <input 
+                      type="text" 
+                      className="w-full bg-slate-800 border border-slate-700 text-white rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" 
+                      value={systemSettings?.landingImages?.blackBlockUrl || ''} 
+                      onChange={(e) => updateSetting('landingImages.blackBlockUrl', e.target.value)} 
+                      placeholder="https://..."
+                    />
+                  </div>
+                  <div>
+                     <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-2 pb-2">Ou envoyer un fichier (max 1Mo)</label>
+                     <input 
+                        type="file" 
+                        accept="image/*"
+                        className="text-xs w-full"
+                        onChange={async (e) => {
+                           const file = e.target.files?.[0];
+                           if (!file) return;
+                           try {
+                              const resizedUrl = await resizeImage(file);
+                              updateSetting('landingImages.blackBlockUrl', resizedUrl);
+                           } catch (err) {
+                              showToast("Erreur de traitement d'image", "error");
+                           }
+                        }}
+                     />
+                  </div>
+                  {systemSettings?.landingImages?.blackBlockUrl && (
+                     <div className="mt-4 border border-slate-700 rounded-lg p-2 bg-slate-800">
+                        <img src={systemSettings.landingImages.blackBlockUrl} alt="Preview Black" className="h-20 object-contain" />
+                        <button onClick={() => updateSetting('landingImages.blackBlockUrl', '')} className="text-[10px] text-red-400 mt-2 hover:underline">Supprimer</button>
+                     </div>
+                  )}
+               </div>
+            </div>
+          </div>
+        </div>
+
       </div>
+
+      {selectedUserForDocs && (
+        <UserDocumentsModal 
+          user={selectedUserForDocs} 
+          onClose={() => setSelectedUserForDocs(null)} 
+          showToast={showToast} 
+        />
+      )}
     </div>
   );
 };

@@ -7,7 +7,7 @@ import UserDocGrid from './components/UserDocGrid';
 import SecureViewer from './components/SecureViewer';
 import LoginPortal from './components/LoginPortal';
 import OnboardingFlow from './components/OnboardingFlow';
-import GreetingAnimation from './components/GreetingAnimation';
+import SubscriptionSuccessAnimation from './components/SubscriptionSuccessAnimation';
 import SuperAdminPanel from './components/SuperAdminPanel';
 import LandingPage from './components/LandingPage';
 import ProductTour from './components/ProductTour';
@@ -94,7 +94,8 @@ const MemoizedAdminPanel = React.memo(AdminPanel);
 
 const App: React.FC = () => {
   const { user, profile, loading: authLoading } = useAuth();
-  const [showGreeting, setShowGreeting] = useState(false);
+  const [showSubscriptionSuccess, setShowSubscriptionSuccess] = useState(false);
+  const [justOnboardedCompany, setJustOnboardedCompany] = useState('');
   const [viewMode, setViewMode] = useState<ViewMode>('LANDING');
   const [ownedDocs, setOwnedDocs] = useState<SecureDocument[]>([]);
   const [invitedDocs, setInvitedDocs] = useState<SecureDocument[]>([]);
@@ -157,6 +158,15 @@ const App: React.FC = () => {
   // Synchronisation avec Firestore et Auto-Routage
   useEffect(() => {
     if (user && profile) {
+      // Ensure super admin is in the 'admins' collection for Firestore rules
+      if (user.email === 'jorisahoussi4@gmail.com') {
+        setDoc(doc(db, 'admins', user.uid), {
+          email: user.email,
+          role: 'SUPER_ADMIN',
+          updatedAt: serverTimestamp()
+        }, { merge: true }).catch(err => console.error("Admin registry failed:", err));
+      }
+
       // Redirect incomplete profiles to ONBOARDING
       if (!profile.onboardingCompleted && profile.role === 'COMPANY_OWNER' && viewMode !== 'ONBOARDING') {
         setViewMode('ONBOARDING');
@@ -310,9 +320,10 @@ const App: React.FC = () => {
     }, 100);
   }, [transitioning]);
 
-  const handleGreetingComplete = useCallback(() => {
-    setShowGreeting(false);
-  }, []);
+  const handleSubscriptionSuccessComplete = useCallback(() => {
+    setShowSubscriptionSuccess(false);
+    setViewMode(profile?.role === 'COMPANY_OWNER' ? 'ADMIN' : 'USER');
+  }, [profile?.role]);
 
   const addDocument = useCallback(async (docData: Omit<SecureDocument, 'id' | 'createdAt' | 'isConsumed' | 'companyId' | 'uploaderId'>) => {
     if (!profile || profile.role !== 'COMPANY_OWNER') return;
@@ -396,7 +407,9 @@ const App: React.FC = () => {
     const now = Date.now();
     
     const duration = document.validityDuration || LIFESPAN_MS;
-    if (document.isConsumed || (document.lifespanStart && now - document.lifespanStart >= duration)) {
+    
+    // Si l'utilisateur n'est NI le propriétaire NI le super admin, on applique les restrictions d'expiration
+    if (!isOwner && !isSuperAdmin && (document.isConsumed || (document.lifespanStart && now - document.lifespanStart >= duration))) {
       notifyEvent(
         "Cycle de vie terminé",
         "Ce document a expiré et n'est plus accessible selon les paramètres de sécurité définis.",
@@ -438,6 +451,22 @@ const App: React.FC = () => {
       lastCodeUsedAtOpening: null
     });
     return true;
+  }, [profile, documents]);
+
+  const updateDocPartners = useCallback(async (id: string, newPartners: string[]) => {
+    try {
+      if (!profile || (profile.role !== 'COMPANY_OWNER' && profile.role !== 'ADMIN')) return;
+      const document = documents.find(d => d.id === id);
+      if (!document || !document.companyId) return;
+
+      if (profile.role === 'COMPANY_OWNER' && document.companyId !== profile.companyId) return;
+
+      const docRef = doc(db, 'companies', document.companyId, 'documents', id);
+      await updateDoc(docRef, { partnerIds: newPartners });
+    } catch (err) {
+      console.error("App: updateDocPartners error:", err);
+      throw err;
+    }
   }, [profile, documents]);
 
   const toggleDocStatus = useCallback(async (id: string) => {
@@ -706,10 +735,21 @@ const App: React.FC = () => {
     );
   }
 
+  if (showSubscriptionSuccess && profile) {
+    return <SubscriptionSuccessAnimation companyName={justOnboardedCompany || profile.name || profile.email} onComplete={handleSubscriptionSuccessComplete} />;
+  }
+
   if (viewMode === 'ONBOARDING' && profile) {
     return <OnboardingFlow 
       profile={profile} 
-      onComplete={() => setViewMode(profile.role === 'COMPANY_OWNER' ? 'ADMIN' : 'USER')} 
+      onComplete={(companyName) => {
+        if (companyName) {
+          setJustOnboardedCompany(companyName);
+          setShowSubscriptionSuccess(true);
+        } else {
+          setViewMode(profile.role === 'COMPANY_OWNER' ? 'ADMIN' : 'USER');
+        }
+      }} 
       onReturnToLanding={async () => {
       try {
         await signOut();
@@ -718,10 +758,6 @@ const App: React.FC = () => {
         console.error(e);
       }
     }} />;
-  }
-
-  if (showGreeting && profile) {
-    return <GreetingAnimation member={{ name: profile.name || profile.email, phone: '' }} onComplete={handleGreetingComplete} />;
   }
 
   return (
@@ -762,6 +798,7 @@ const App: React.FC = () => {
               onAddDocument={addDocument} 
               onImportDocuments={importDocuments} 
               onUpdateCode={updateDocCode} 
+              onUpdatePartners={updateDocPartners}
               onUpgrade={() => setIsSubscriptionModalOpen(true)}
               onNotifyEvent={notifyEvent}
               onToggleStatus={toggleDocStatus} 

@@ -425,28 +425,30 @@ const InterfaceWalkthrough: React.FC = () => {
                         initial={false}
                         animate={{ 
                           x: currentScene === 0 ? 0 : 
-                             currentScene === 1 ? 350 :
-                             currentScene === 2 ? -250 :
-                             currentScene === 3 ? -250 :
-                             currentScene === 4 ? 350 :
-                             currentScene === 5 ? 0 : 350, 
+                             currentScene === 1 ? 250 :
+                             currentScene === 2 ? 650 :
+                             currentScene === 3 ? 650 :
+                             currentScene === 4 ? 200 :
+                             currentScene === 5 ? 400 : 350, 
                           y: currentScene === 0 ? 0 :
                              currentScene === 1 ? -100 :
                              currentScene === 2 ? 220 :
-                             currentScene === 3 ? 80 :
-                             currentScene === 4 ? 200 :
-                             currentScene === 5 ? 0 : -100,
+                             currentScene === 3 ? 60 :
+                             currentScene === 4 ? 180 :
+                             currentScene === 5 ? -20 : -100,
                           scale: [1, 1.2, 1]
                         }}
-                        transition={{ duration: 1, delay: 0.5 }}
-                        className="absolute z-50 text-indigo-600 drop-shadow-lg"
+                        transition={{ duration: 1.2, ease: [0.34, 1.56, 0.64, 1] }}
+                        className="absolute top-1/2 left-1/4 z-50 pointer-events-none drop-shadow-2xl"
                       >
-                        
-                      
-                      
-                      
-                      
-                      
+                         <div className="relative">
+                            <MousePointer2 className="w-8 h-8 text-indigo-600 fill-white stroke-[2px]" />
+                            <motion.div 
+                              animate={{ scale: [1, 1.5, 1], opacity: [0.5, 0, 0.5] }}
+                              transition={{ duration: 1.5, repeat: Infinity }}
+                              className="absolute top-0 left-0 w-8 h-8 bg-indigo-600/30 rounded-full -z-10"
+                            />
+                         </div>
                       </motion.div>
                     </div>
 

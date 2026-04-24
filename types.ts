@@ -12,6 +12,11 @@ export interface UserProfile {
     companyName: string;
     phone: string;
     sector: string;
+    jobTitle?: string;
+  };
+  onboardingSurvey?: {
+    motivation: string;
+    discovery: string;
   };
   name?: string;
   isBlocked?: boolean;
@@ -47,6 +52,7 @@ export interface SecureDocument {
   validityDuration?: number; // In milliseconds
   companyName?: string;
   keywords?: string[];
+  isBlocked?: boolean;
 }
 
 export interface SecurityAlert {
@@ -67,6 +73,13 @@ export type ViewMode = 'LANDING' | 'USER' | 'ADMIN' | 'VIEWER' | 'LOGIN' | 'ONBO
 export interface AuthorizedMember {
   name: string;
   phone: string;
+}
+
+export interface SystemSettings {
+  landingImages?: {
+    whiteBlockUrl?: string;
+    blackBlockUrl?: string;
+  };
 }
 
 export interface AppState {

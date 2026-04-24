@@ -3,11 +3,11 @@ import { motion, AnimatePresence } from 'motion/react';
 import { UserProfile } from '../types';
 import { db } from '../services/firebaseService';
 import { doc, updateDoc, deleteDoc } from 'firebase/firestore';
-import { CheckCircle2, Building, Phone, Briefcase, ChevronRight, ShieldCheck, Clock, User } from 'lucide-react';
+import { CheckCircle2, Building, Phone, Briefcase, ChevronRight, ShieldCheck, Clock, User, ChevronDown } from 'lucide-react';
 
 interface OnboardingFlowProps {
   profile: UserProfile;
-  onComplete?: () => void;
+  onComplete?: (companyName?: string) => void;
   onReturnToLanding?: () => void;
 }
 
@@ -17,7 +17,8 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ profile, onComplete, on
   const [formData, setFormData] = useState({
     companyName: '',
     phone: '',
-    sector: ''
+    sector: '',
+    jobTitle: ''
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -37,6 +38,7 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ profile, onComplete, on
             <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Détails de l'organisation</h4>
             <div className="space-y-2">
               <div className="flex items-center gap-2 text-xs font-bold text-slate-700"><Building className="w-3 h-3 text-slate-400" /> {profile.onboardingData?.companyName || '-'}</div>
+              <div className="flex items-center gap-2 text-xs font-bold text-slate-700"><User className="w-3 h-3 text-slate-400" /> {profile.onboardingData?.jobTitle || '-'}</div>
               <div className="flex items-center gap-2 text-xs font-bold text-slate-700"><Briefcase className="w-3 h-3 text-slate-400" /> {profile.onboardingData?.sector || '-'}</div>
             </div>
           </div>
@@ -88,7 +90,7 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ profile, onComplete, on
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.companyName || !formData.phone || !formData.sector) return;
+    if (!formData.companyName || !formData.phone || !formData.sector || !formData.jobTitle) return;
     setIsSubmitting(true);
     
     try {
@@ -100,7 +102,7 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ profile, onComplete, on
         onboardingData: formData,
         onboardingCompleted: true
       });
-      if (onComplete) onComplete();
+      if (onComplete) onComplete(formData.companyName);
     } catch (error) {
       console.error('Error submitting onboarding:', error);
       alert('Une erreur est survenue. Veuillez réessayer.');
@@ -273,6 +275,39 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ profile, onComplete, on
                        className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-sm font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:border-transparent transition-all"
                        placeholder="Ex: TechCorp Inc."
                      />
+                   </div>
+
+                   <div className="space-y-2">
+                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2"><Briefcase className="w-3 h-3" /> Rôle dans l'entreprise</label>
+                     <div className="relative">
+                       <select
+                         required
+                         name="jobTitle"
+                         value={formData.jobTitle || ''}
+                         onChange={handleChange as any}
+                         className="w-full appearance-none bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-sm font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:border-transparent transition-all cursor-pointer"
+                       >
+                         <option value="" disabled>Sélectionnez votre poste</option>
+                         <option value="PDG / CEO">PDG / CEO</option>
+                         <option value="Directeur Général">Directeur Général</option>
+                         <option value="Directeur Financier (CFO)">Directeur Financier (CFO)</option>
+                         <option value="Directeur Technique (CTO)">Directeur Technique (CTO)</option>
+                         <option value="Directeur des Opérations (COO)">Directeur des Opérations (COO)</option>
+                         <option value="Directeur Juridique">Directeur Juridique</option>
+                         <option value="Directeur Commercial">Directeur Commercial</option>
+                         <option value="Directeur des Ressources Humaines">Directeur des Ressources Humaines</option>
+                         <option value="Chef de Projet">Chef de Projet</option>
+                         <option value="Consultant(e)">Consultant(e)</option>
+                         <option value="Assistant(e) de Direction">Assistant(e) de Direction</option>
+                         <option value="Cadre">Cadre</option>
+                         <option value="Employé(e)">Employé(e)</option>
+                         <option value="Freelance / Indépendant">Freelance / Indépendant</option>
+                         <option value="Autre">Autre...</option>
+                       </select>
+                       <div className="absolute inset-y-0 right-0 flex items-center px-4 pointer-events-none">
+                         <ChevronDown className="w-4 h-4 text-slate-400" />
+                       </div>
+                     </div>
                    </div>
 
                    <div className="space-y-2">

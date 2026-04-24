@@ -3,7 +3,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { SecureDocument, UserProfile } from '../types';
 import { PARTNER_LIMITS } from '../constants';
 import { summarizeDocument } from '../services/documentService';
-import { Sparkles, Loader2, Users, Image as ImageIcon } from 'lucide-react';
+import { Sparkles, Loader2, Users, Image as ImageIcon, Plus, X } from 'lucide-react';
 import imageCompression from 'browser-image-compression';
 
 interface AdminPanelProps {
@@ -16,6 +16,7 @@ interface AdminPanelProps {
   onUpdateCode: (id: string, newCode: string) => Promise<boolean>;
   onToggleStatus: (id: string) => void;
   onDeleteDocument: (id: string) => void;
+  onUpdatePartners?: (id: string, newPartners: string[]) => Promise<void>;
   onUpgrade?: () => void;
   onNotifyEvent?: (title: string, message: string, solution?: string, actionBtn?: string, onAction?: () => void) => void;
 }
@@ -49,7 +50,7 @@ const COLORS = [
   { label: 'Vert', value: '#16a34a' }
 ];
 
-const AdminPanel: React.FC<AdminPanelProps> = ({ documents, profile, storageUsage, storageLimit, onAddDocument, onImportDocuments, onUpdateCode, onToggleStatus, onDeleteDocument, onUpgrade, onNotifyEvent }) => {
+const AdminPanel: React.FC<AdminPanelProps> = ({ documents, profile, storageUsage, storageLimit, onAddDocument, onImportDocuments, onUpdateCode, onUpdatePartners, onToggleStatus, onDeleteDocument, onUpgrade, onNotifyEvent }) => {
   const [title, setTitle] = useState('');
   const [code, setCode] = useState('');
   const [isFullScreen, setIsFullScreen] = useState(false);
@@ -270,11 +271,19 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ documents, profile, storageUsag
           generateSummary();
           break;
         case 'add_partner':
-          setPartnerEmails(prev => prev ? `${prev}, ${payload}` : payload);
+          setPartnerEmails(prev => {
+             const newArr = [...prev];
+             if (newArr.length === 1 && newArr[0] === '') newArr[0] = payload;
+             else if (!newArr.includes(payload)) newArr.push(payload);
+             return newArr;
+          });
           showToast(`Partenaire ${payload} ajouté.`, 'success');
           break;
         case 'remove_partner':
-          setPartnerEmails(prev => prev.split(',').map(e => e.trim()).filter(e => e !== payload).join(', '));
+          setPartnerEmails(prev => {
+             const newArr = prev.filter(e => e.toLowerCase() !== payload.toLowerCase());
+             return newArr.length === 0 ? [''] : newArr;
+          });
           showToast(`Partenaire ${payload} retiré.`, 'success');
           break;
       }
@@ -295,7 +304,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ documents, profile, storageUsag
     };
   }, [updateStats, profile]);
 
-  const [partnerEmails, setPartnerEmails] = useState('');
+  const [partnerEmails, setPartnerEmails] = useState<string[]>(['']);
   
   const formatBytes = (bytes: number) => {
     if (bytes === 0) return '0 B';
@@ -319,7 +328,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ documents, profile, storageUsag
       return;
     }
     
-    const partnerIds = partnerEmails.split(',').map(email => email.trim().toLowerCase()).filter(email => email !== '');
+    const partnerIds = partnerEmails.map(email => email.trim().toLowerCase()).filter(email => email !== '');
     
     if (partnerIds.length === 0) {
       if (onNotifyEvent) {
@@ -443,7 +452,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ documents, profile, storageUsag
     setTitle('');
     if (editorRef.current) editorRef.current.innerHTML = '';
     setCode('');
-    setPartnerEmails('');
+    setPartnerEmails(['']);
     setDocSummary('');
     setStats({ words: 0, time: 0 });
   };
@@ -604,15 +613,51 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ documents, profile, storageUsag
                   <span>Partenaires (Obligatoire)</span>
                   <span className="text-indigo-600">Limite: {PARTNER_LIMITS[profile?.subscriptionTier || 'FREE']}</span>
                 </label>
-                <div className="relative">
-                  <input 
-                    type="text" 
-                    value={partnerEmails}
-                    onChange={(e) => setPartnerEmails(e.target.value)}
-                    className="bg-white border-2 border-slate-100 rounded-xl p-4 pr-12 text-slate-600 font-bold w-full md:w-[300px] outline-none shadow-inner focus:border-indigo-600"
-                    placeholder="email1@partenaire.com, email2@..."
-                  />
-                  <Users className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300" />
+                <div className="flex flex-col gap-2">
+                  {partnerEmails.map((email, index) => (
+                    <div key={index} className="relative flex gap-2 w-full md:w-[300px]">
+                      <div className="relative flex-1">
+                        <input 
+                          type="email" 
+                          value={email}
+                          onChange={(e) => {
+                            const newEmails = [...partnerEmails];
+                            newEmails[index] = e.target.value;
+                            setPartnerEmails(newEmails);
+                          }}
+                          className="bg-white border-2 border-slate-100 rounded-xl p-3 pr-10 text-slate-600 font-bold w-full outline-none shadow-inner focus:border-indigo-600 text-xs"
+                          placeholder="email@partenaire.com"
+                        />
+                        <Users className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300" />
+                      </div>
+                      {index === partnerEmails.length - 1 ? (
+                        <button 
+                          type="button"
+                          onClick={() => {
+                             if (partnerEmails.length < (PARTNER_LIMITS[profile?.subscriptionTier || 'FREE'])) {
+                               setPartnerEmails([...partnerEmails, '']);
+                             } else {
+                               showToast(`Limite de ${PARTNER_LIMITS[profile?.subscriptionTier || 'FREE']} partenaires atteinte.`, 'error');
+                             }
+                          }}
+                          className="w-11 h-11 shrink-0 flex items-center justify-center bg-indigo-50 text-indigo-600 rounded-xl hover:bg-indigo-600 hover:text-white transition-colors"
+                        >
+                          <Plus className="w-5 h-5" />
+                        </button>
+                      ) : (
+                        <button 
+                          type="button"
+                          onClick={() => {
+                            const newEmails = partnerEmails.filter((_, i) => i !== index);
+                            setPartnerEmails(newEmails);
+                          }}
+                          className="w-11 h-11 shrink-0 flex items-center justify-center bg-red-50 text-red-600 rounded-xl hover:bg-red-600 hover:text-white transition-colors"
+                        >
+                          <X className="w-5 h-5" />
+                        </button>
+                      )}
+                    </div>
+                  ))}
                 </div>
               </div>
               <div>
@@ -718,7 +763,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ documents, profile, storageUsag
 
                  <div className="absolute inset-0 pointer-events-none select-none opacity-[0.02] z-0" 
                       style={{ 
-                        backgroundImage: `url("data:image/svg+xml,%3Csvg width='500' height='250' viewBox='0 0 500 250' xmlns='http://www.w3.org/2000/svg'%3E%3Ctext x='0' y='120' font-family='sans-serif' font-weight='900' font-size='14' fill='black' transform='rotate(-20 50 120)'%3EPERAFIND STRATEGIC INTELLIGENCE%3C/text%3E%3C/svg%3E")`,
+                        backgroundImage: `url("data:image/svg+xml,%3Csvg width='500' height='250' viewBox='0 0 500 250' xmlns='http://www.w3.org/2000/svg'%3E%3Ctext x='0' y='120' font-family='sans-serif' font-weight='900' font-size='14' fill='black' transform='rotate(-20 50 120)'%3E${encodeURIComponent(profile?.companyName ? `PROPRIÉTÉ DE ${profile.companyName.toUpperCase()}` : "DOCUMENT SÉCURISÉ")}%3C/text%3E%3C/svg%3E")`,
                         backgroundRepeat: 'repeat'
                       }} 
                  />
@@ -731,7 +776,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ documents, profile, storageUsag
 
                     <div className="max-w-4xl text-center">
                        <p className="text-[#8fa1b4] text-[9px] md:text-[11px] font-bold uppercase tracking-[0.15em] leading-[1.8] opacity-80">
-                          CE DOCUMENT EST LA PROPRIÉTÉ EXCLUSIVE DE PERAFIND. TOUTE REPRODUCTION OU DIVULGATION CONSTITUE UNE FAUTE GRAVE.
+                          CE DOCUMENT EST LA PROPRIÉTÉ EXCLUSIVE DE {profile?.companyName ? profile.companyName.toUpperCase() : "VOTRE ENTREPRISE"}. TOUTE REPRODUCTION OU DIVULGATION CONSTITUE UNE FAUTE GRAVE.
                        </p>
                     </div>
 
@@ -848,8 +893,27 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ documents, profile, storageUsag
                       <div className="flex flex-wrap gap-1 max-w-[250px]">
                         {doc.partnerIds && doc.partnerIds.length > 0 ? (
                           doc.partnerIds.map((email, i) => (
-                            <span key={i} className="text-[9px] bg-indigo-50 text-indigo-600 px-2 py-1 rounded-md font-black truncate max-w-full border border-indigo-100" title={email}>
+                            <span key={i} className="group/partner text-[9px] bg-indigo-50 text-indigo-600 px-2 py-1 rounded-md font-black truncate max-w-full border border-indigo-100 flex items-center gap-1.5" title={email}>
                               {email}
+                              <button 
+                                onClick={async (e) => {
+                                  e.stopPropagation();
+                                  if (onUpdatePartners) {
+                                    try {
+                                      const newPartners = doc.partnerIds.filter(p => p !== email);
+                                      await onUpdatePartners(doc.id, newPartners);
+                                      showToast(`Partenaire ${email} retiré.`);
+                                    } catch (err) {
+                                      console.error("Partner removal error:", err);
+                                      showToast("Erreur lors du retrait du partenaire.", "error");
+                                    }
+                                  }
+                                }}
+                                className="opacity-0 group-hover/partner:opacity-100 hover:text-red-600 transition-all cursor-pointer p-0.5"
+                                title="Retirer ce partenaire"
+                              >
+                                <X className="w-3 h-3" />
+                              </button>
                             </span>
                           ))
                         ) : (
