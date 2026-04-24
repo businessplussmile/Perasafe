@@ -1,10 +1,13 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import * as tf from '@tensorflow/tfjs';
 import * as cocoSsd from '@tensorflow-models/coco-ssd';
+import { SecureDocument, UserProfile } from '../types';
+import { logSecurityAlert } from '../services/securityService';
 
-export const useCameraLeakDetection = (documentId: string, ownerEmail: string, readerEmail: string) => {
+export const useCameraLeakDetection = (doc: SecureDocument, readerProfile: UserProfile | null) => {
   const [modelLoaded, setModelLoaded] = useState(false);
   const [cameraEnabled, setCameraEnabled] = useState(false);
+  const [cameraError, setCameraError] = useState(false);
   const [leakDetected, setLeakDetected] = useState(false);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const modelRef = useRef<cocoSsd.ObjectDetection | null>(null);
@@ -45,12 +48,12 @@ export const useCameraLeakDetection = (documentId: string, ownerEmail: string, r
         streamRef.current = stream;
         
         if (!videoRef.current) {
-          const videoElements = document.createElement('video');
+          const videoElements = window.document.createElement('video');
           videoElements.style.display = 'none';
           videoElements.autoplay = true;
           videoElements.playsInline = true;
           videoRef.current = videoElements;
-          document.body.appendChild(videoElements);
+          window.document.body.appendChild(videoElements);
         }
 
         videoRef.current.srcObject = stream;
@@ -62,7 +65,7 @@ export const useCameraLeakDetection = (documentId: string, ownerEmail: string, r
       } catch (error) {
         if (!isMounted.current) return;
         console.error("Camera access denied or unavailable", error);
-        alert("La sécurisation PeraSafe requiert l'accès à la caméra pour prévenir les fuites de données (anti-photo).");
+        setCameraError(true);
       }
     };
 
@@ -90,25 +93,22 @@ export const useCameraLeakDetection = (documentId: string, ownerEmail: string, r
   }, []);
 
   const signalLeak = useCallback(async () => {
-    if (leakDetected || !isMounted.current) return; // Prevent multiple signals
+    if (leakDetected || !isMounted.current || !readerProfile) return; // Prevent multiple signals
     setLeakDetected(true);
     
-    // In a real environment, this sends an HTTP request to the backend.
     console.warn("ALERTE DE FUITE DE DONNÉES DÉTECTÉE!");
-    console.log(`Envoi de l'alerte au propriétaire (${ownerEmail}) et au super admin (jorisahoussi4@gmail.com)`);
-
-    // We simulate the signal sending process
+    
     try {
-      // setTimeout to simulate network latency
-      await new Promise(resolve => setTimeout(resolve, 500));
+      // Log alert to document owner
+      await logSecurityAlert('PHONE_DETECTED', doc, readerProfile);
+      
       if (!isMounted.current) return;
-      // TODO: the database could log this "leak_alerts" locally.
-      alert(`ALERTE DE SÉCURITÉ: Une caméra ou un téléphone a été détecté. L'accès est révoqué et un signal a été envoyé au super admin et au propriétaire.`);
+      alert(`ALERTE DE SÉCURITÉ: Une caméra ou un téléphone a été détecté. L'accès est révoqué et un signal a été envoyé au propriétaire.`);
     } catch(err) {
       if (!isMounted.current) return;
       console.error(err);
     }
-  }, [leakDetected, ownerEmail]);
+  }, [leakDetected, doc, readerProfile]);
 
   useEffect(() => {
     if (!modelLoaded || !cameraEnabled || leakDetected || !videoRef.current) return;
@@ -140,5 +140,5 @@ export const useCameraLeakDetection = (documentId: string, ownerEmail: string, r
     };
   }, [modelLoaded, cameraEnabled, leakDetected, signalLeak]);
 
-  return { cameraEnabled, leakDetected };
+  return { cameraEnabled, cameraError, leakDetected };
 };

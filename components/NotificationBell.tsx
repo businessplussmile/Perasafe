@@ -1,22 +1,24 @@
 
 import React, { useState, useMemo } from 'react';
-import { Bell, Info, Calendar, X, ExternalLink } from 'lucide-react';
+import { Bell, Info, Calendar, X, ExternalLink, ShieldAlert, Camera, Copy, MonitorOff } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { UserProfile } from '../types';
+import { UserProfile, SecurityAlert } from '../types';
 
 interface Notification {
   id: string;
   title: string;
   message: string;
-  type: 'info' | 'warning' | 'important';
+  type: 'info' | 'warning' | 'important' | 'security';
   date: number;
+  originalAlert?: SecurityAlert;
 }
 
 interface NotificationBellProps {
   profile: UserProfile | null;
+  alerts?: SecurityAlert[];
 }
 
-const NotificationBell: React.FC<NotificationBellProps> = ({ profile }) => {
+const NotificationBell: React.FC<NotificationBellProps> = ({ profile, alerts = [] }) => {
   const [isOpen, setIsOpen] = useState(false);
 
   const notifications = useMemo(() => {
@@ -29,6 +31,36 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ profile }) => {
       message: 'Votre coffre-fort numérique est prêt. Sécurisez vos premières notes dès maintenant.',
       type: 'info',
       date: profile?.createdAt || Date.now()
+    });
+
+    // Security Alerts Integration
+    alerts.forEach(alert => {
+      let icon = <ShieldAlert className="w-4 h-4" />;
+      let title = "Alerte de Sécurité";
+      let message = `Violation détectée sur le document "${alert.documentTitle}" par ${alert.readerEmail}.`;
+
+      if (alert.type === 'PHONE_DETECTED') {
+        title = "Tentative de captation (Téléphone)";
+        message = `Un téléphone a été détecté par la caméra de ${alert.readerEmail} lors de la lecture de "${alert.documentTitle}".`;
+      } else if (alert.type === 'SCREENSHOT_ATTEMPT') {
+        title = "Tentative de capture d'écran";
+        message = `Une capture d'écran ou un raccourci interdit a été détecté pour ${alert.readerEmail} sur "${alert.documentTitle}".`;
+      } else if (alert.type === 'CLIPBOARD_COPY') {
+        title = "Tentative de copie (Presse-papier)";
+        message = `L'utilisateur ${alert.readerEmail} a tenté de copier le contenu de "${alert.documentTitle}".`;
+      } else if (alert.type === 'BLUR_LOSS') {
+        title = "Perte de focus (Risque de capture)";
+        message = `La fenêtre sécurisée a perdu le focus pour ${alert.readerEmail} (possible enregistreur externe).`;
+      }
+
+      list.push({
+        id: alert.id,
+        title,
+        message,
+        type: 'security',
+        date: alert.timestamp,
+        originalAlert: alert
+      });
     });
 
     // Subscription Notification
@@ -58,7 +90,18 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ profile }) => {
     }
 
     return list.sort((a, b) => b.date - a.date);
-  }, [profile]);
+  }, [profile, alerts]);
+
+  const getAlertIcon = (type: Notification['type'], alertType?: SecurityAlert['type']) => {
+    if (type === 'security') {
+      if (alertType === 'PHONE_DETECTED') return <Camera className="w-4 h-4" />;
+      if (alertType === 'SCREENSHOT_ATTEMPT') return <MonitorOff className="w-4 h-4" />;
+      if (alertType === 'CLIPBOARD_COPY') return <Copy className="w-4 h-4" />;
+      return <ShieldAlert className="w-4 h-4" />;
+    }
+    if (type === 'warning') return <Calendar className="w-4 h-4" />;
+    return <Info className="w-4 h-4" />;
+  };
 
   return (
     <div className="relative">
@@ -68,8 +111,8 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ profile }) => {
         className="relative w-10 h-10 md:w-12 md:h-12 flex items-center justify-center rounded-xl md:rounded-2xl bg-white border border-slate-200 text-slate-400 hover:text-indigo-600 hover:border-indigo-100 transition-all shadow-sm"
       >
         <Bell className="w-5 h-5" />
-        {notifications.length > 0 && (
-          <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-red-500 rounded-full border-2 border-white"></span>
+        {notifications.filter(n => n.type === 'security' || n.type === 'important').length > 0 && (
+          <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-red-500 rounded-full border-2 border-white animate-pulse"></span>
         )}
       </button>
 
@@ -102,16 +145,17 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ profile }) => {
                         <div className={`mt-1 w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${
                           n.type === 'warning' ? 'bg-orange-100 text-orange-600' : 
                           n.type === 'important' ? 'bg-red-100 text-red-600' : 
+                          n.type === 'security' ? 'bg-red-600 text-white shadow-lg shadow-red-600/20' :
                           'bg-indigo-100 text-indigo-600'
                         }`}>
-                          {n.type === 'warning' ? <Calendar className="w-4 h-4" /> : <Info className="w-4 h-4" />}
+                          {getAlertIcon(n.type, n.originalAlert?.type)}
                         </div>
                         <div>
-                          <p className="font-black text-xs uppercase tracking-tight text-slate-900 mb-1">{n.title}</p>
+                          <p className={`font-black text-xs uppercase tracking-tight mb-1 ${n.type === 'security' ? 'text-red-600' : 'text-slate-900'}`}>{n.title}</p>
                           <p className="text-xs text-slate-500 leading-relaxed font-medium">{n.message}</p>
                           <div className="mt-3 flex items-center gap-2">
                              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                               {new Date(n.date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}
+                               {new Date(n.date).toLocaleString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
                              </span>
                              {n.id === 'sub-ending' && (
                                <button className="text-[10px] font-black text-indigo-600 uppercase tracking-widest flex items-center gap-1 hover:gap-2 transition-all">

@@ -52,6 +52,24 @@
         "lastCodeUsedAtOpening": { "type": "string" }
       },
       "required": ["id", "title", "content", "accessCode", "companyId", "createdAt", "uploaderId"]
+    },
+    "SecurityAlert": {
+      "title": "SecurityAlert",
+      "description": "Alert triggered when a security violation is detected (screenshot, phone, etc.)",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "type": { "type": "string", "enum": ["SCREENSHOT_ATTEMPT", "PHONE_DETECTED", "BLUR_LOSS", "CLIPBOARD_COPY"] },
+        "documentId": { "type": "string" },
+        "documentTitle": { "type": "string" },
+        "companyId": { "type": "string" },
+        "ownerId": { "type": "string" },
+        "readerEmail": { "type": "string" },
+        "readerUid": { "type": "string" },
+        "timestamp": { "type": "number" },
+        "details": { "type": "string" }
+      },
+      "required": ["type", "documentId", "companyId", "ownerId", "readerEmail", "timestamp"]
     }
   },
   "firestore": {
@@ -66,6 +84,10 @@
     "/companies/{companyId}/documents/{docId}": {
       "schema": "SecureDocument",
       "description": "Documents shared by the company"
+    },
+    "/companies/{companyId}/securityAlerts/{alertId}": {
+      "schema": "SecurityAlert",
+      "description": "Security violations logs for the company"
     }
   }
 }

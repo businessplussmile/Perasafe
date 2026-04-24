@@ -49,6 +49,19 @@ export interface SecureDocument {
   keywords?: string[];
 }
 
+export interface SecurityAlert {
+  id: string;
+  type: 'SCREENSHOT_ATTEMPT' | 'PHONE_DETECTED' | 'BLUR_LOSS' | 'CLIPBOARD_COPY';
+  documentId: string;
+  documentTitle: string;
+  companyId: string;
+  ownerId: string;
+  readerEmail: string;
+  readerUid: string;
+  timestamp: number;
+  details: string;
+}
+
 export type ViewMode = 'LANDING' | 'USER' | 'ADMIN' | 'VIEWER' | 'LOGIN' | 'ONBOARDING' | 'SUBSCRIPTION' | 'PROTOCOL' | 'PRIVACY';
 
 export interface AuthorizedMember {

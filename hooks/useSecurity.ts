@@ -1,12 +1,20 @@
 
 import { useEffect } from 'react';
+import { UserProfile, SecureDocument } from '../types';
+import { logSecurityAlert, AlertType } from '../services/securityService';
 
-export const useSecurity = (enabled: boolean, onSecurityTrigger?: (active: boolean) => void) => {
+export const useSecurity = (
+  enabled: boolean, 
+  doc: SecureDocument | null,
+  readerProfile: UserProfile | null,
+  onSecurityTrigger?: (active: boolean) => void
+) => {
   useEffect(() => {
-    if (!enabled) return;
+    if (!enabled || !doc || !readerProfile) return;
 
-    const triggerPanic = () => {
+    const triggerPanic = (type: AlertType) => {
       if (onSecurityTrigger) onSecurityTrigger(true);
+      logSecurityAlert(type, doc, readerProfile);
     };
 
     const releasePanic = () => {
@@ -31,41 +39,49 @@ export const useSecurity = (enabled: boolean, onSecurityTrigger?: (active: boole
 
       if (forbiddenKeys.includes(e.key) || forbiddenCombos.some(combo => combo)) {
         e.preventDefault();
-        triggerPanic();
+        triggerPanic('SCREENSHOT_ATTEMPT');
         return false;
       }
     };
 
     const handleVisibilityChange = () => {
-      if (document.visibilityState !== 'visible') {
-        triggerPanic();
+      if (window.document.visibilityState !== 'visible') {
+        triggerPanic('BLUR_LOSS');
       }
     };
 
     const handleBlur = () => {
       // Déclenchement instantané dès que la fenêtre perd le focus
-      triggerPanic();
+      triggerPanic('BLUR_LOSS');
     };
 
     const handleFocus = () => {
-      // Optionnel : on peut choisir de ne pas libérer automatiquement pour plus de sécurité
-      // mais pour l'expérience utilisateur, on libère au focus
       releasePanic();
     };
 
     const threshold = 160;
     const handleResize = () => {
       if (window.outerWidth - window.innerWidth > threshold || window.outerHeight - window.innerHeight > threshold) {
-        triggerPanic();
+        triggerPanic('BLUR_LOSS');
       }
     };
+
+    const handleCopy = (e: ClipboardEvent) => {
+      e.preventDefault();
+      triggerPanic('CLIPBOARD_COPY');
+    };
+
+    const handleSelectStart = (e: Event) => e.preventDefault();
 
     window.addEventListener('contextmenu', handleContextMenu);
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('blur', handleBlur);
     window.addEventListener('focus', handleFocus);
     window.addEventListener('resize', handleResize);
-    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('copy', handleCopy);
+    window.addEventListener('cut', handleCopy);
+    window.addEventListener('selectstart', handleSelectStart);
+    window.document.addEventListener('visibilitychange', handleVisibilityChange);
 
     const handleDrag = (e: DragEvent) => e.preventDefault();
     window.addEventListener('dragstart', handleDrag);
@@ -76,8 +92,11 @@ export const useSecurity = (enabled: boolean, onSecurityTrigger?: (active: boole
       window.removeEventListener('blur', handleBlur);
       window.removeEventListener('focus', handleFocus);
       window.removeEventListener('resize', handleResize);
+      window.removeEventListener('copy', handleCopy);
+      window.removeEventListener('cut', handleCopy);
+      window.removeEventListener('selectstart', handleSelectStart);
       window.removeEventListener('dragstart', handleDrag);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [enabled, onSecurityTrigger]);
+  }, [enabled, doc, readerProfile, onSecurityTrigger]);
 };

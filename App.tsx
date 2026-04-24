@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { SecureDocument, ViewMode, UserProfile } from './types';
+import { SecureDocument, ViewMode, UserProfile, SecurityAlert } from './types';
 import { PARTNER_LIMITS, DOC_LIMITS, STORAGE_LIMITS } from './constants';
 import AdminPanel from './components/AdminPanel';
 import UserDocGrid from './components/UserDocGrid';
@@ -98,6 +98,7 @@ const App: React.FC = () => {
   const [viewMode, setViewMode] = useState<ViewMode>('LANDING');
   const [ownedDocs, setOwnedDocs] = useState<SecureDocument[]>([]);
   const [invitedDocs, setInvitedDocs] = useState<SecureDocument[]>([]);
+  const [securityAlerts, setSecurityAlerts] = useState<SecurityAlert[]>([]);
   const [activeDoc, setActiveDoc] = useState<SecureDocument | null>(null);
   const [transitioning, setTransitioning] = useState(false);
   const [docToDelete, setDocToDelete] = useState<string | null>(null);
@@ -200,13 +201,13 @@ const App: React.FC = () => {
       }
       
       // Et les documents où ils sont invités
-      const qInvited = query(collectionGroup(db, 'documents'), where('partnerIds', 'array-contains', profile.email));
+      const qInvited = query(collectionGroup(db, 'documents'), where('partnerIds', 'array-contains', profile.email.toLowerCase()));
       unsubInvited = onSnapshot(qInvited, (snapshot) => {
         setInvitedDocs(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as SecureDocument)));
       });
     } else if (profile.role === 'PARTNER') {
       // Les partenaires voient uniquement les documents où ils sont listés
-      const qInvited = query(collectionGroup(db, 'documents'), where('partnerIds', 'array-contains', profile.email));
+      const qInvited = query(collectionGroup(db, 'documents'), where('partnerIds', 'array-contains', profile.email.toLowerCase()));
       unsubInvited = onSnapshot(qInvited, (snapshot) => {
         setInvitedDocs(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as SecureDocument)));
       });
@@ -279,6 +280,24 @@ const App: React.FC = () => {
     const timer = setInterval(checkExpiration, 10000); 
     return () => clearInterval(timer);
   }, [documents, profile]);
+
+  useEffect(() => {
+    if (!profile || profile.role !== 'COMPANY_OWNER' || !profile.companyId) {
+      setSecurityAlerts([]);
+      return;
+    }
+
+    const q = query(
+      collection(db, 'companies', profile.companyId, 'securityAlerts')
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const alerts = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as SecurityAlert));
+      setSecurityAlerts(alerts.sort((a, b) => b.timestamp - a.timestamp));
+    });
+
+    return () => unsubscribe();
+  }, [profile]);
 
   const switchView = useCallback((mode: ViewMode, doc: SecureDocument | null = null) => {
     if (transitioning) return;
@@ -362,7 +381,7 @@ const App: React.FC = () => {
     
     // Sécurité supplémentaire : vérifier si l'utilisateur est autorisé
     const isOwner = profile.role === 'COMPANY_OWNER' && profile.companyId === document.companyId;
-    const isPartner = profile.role === 'PARTNER' && document.partnerIds.includes(profile.email);
+    const isPartner = document.partnerIds.some(email => email.toLowerCase() === profile.email.toLowerCase());
     const isSuperAdmin = profile.role === 'ADMIN';
 
     if (!isOwner && !isPartner && !isSuperAdmin) {
@@ -631,7 +650,7 @@ const App: React.FC = () => {
               </button>
             )}
 
-            {user && <NotificationBell profile={profile} />}
+            {user && <NotificationBell profile={profile} alerts={securityAlerts} />}
 
             {user && (
               <button 
@@ -766,6 +785,7 @@ const App: React.FC = () => {
           {viewMode === 'VIEWER' && activeDoc && (
           <SecureViewer 
             document={activeDoc} 
+            readerProfile={profile}
             onExit={() => switchView('USER')} 
             isAdmin={profile?.role === 'COMPANY_OWNER' && activeDoc.companyId === profile.companyId} 
             onDelete={() => setDocToDelete(activeDoc.id)} 

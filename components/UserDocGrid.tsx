@@ -233,6 +233,21 @@ const UserDocGrid: React.FC<UserDocGridProps> = ({ documents, onOpenDoc, isAdmin
                       {doc.summary}
                     </p>
                   )}
+                  {isAdmin && doc.partnerIds && doc.partnerIds.length > 0 && doc.companyId === currentCompanyId && (
+                    <div className="mt-3 pt-3 border-t border-slate-50">
+                      <span className="text-[7px] font-black text-slate-400 uppercase tracking-widest block mb-1">Partenaires Invités :</span>
+                      <div className="flex flex-wrap gap-1">
+                        {doc.partnerIds.slice(0, 3).map((email, i) => (
+                          <span key={i} className="text-[7px] bg-indigo-50/50 text-indigo-400 border border-indigo-100/30 px-1.5 py-0.5 rounded font-black truncate max-w-full" title={email}>
+                            {email}
+                          </span>
+                        ))}
+                        {doc.partnerIds.length > 3 && (
+                          <span className="text-[7px] text-slate-300 font-bold">+{doc.partnerIds.length - 3}</span>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </button>
             </div>

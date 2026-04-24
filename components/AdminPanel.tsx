@@ -319,7 +319,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ documents, profile, storageUsag
       return;
     }
     
-    const partnerIds = partnerEmails.split(',').map(email => email.trim()).filter(email => email !== '');
+    const partnerIds = partnerEmails.split(',').map(email => email.trim().toLowerCase()).filter(email => email !== '');
     
     if (partnerIds.length === 0) {
       if (onNotifyEvent) {
@@ -820,6 +820,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ documents, profile, storageUsag
               <tr>
                 <th className="px-8 py-6">ID du Package</th>
                 <th className="px-8 py-6">Code Pivot</th>
+                <th className="px-8 py-6">Partenaires</th>
                 <th className="px-8 py-6 text-center">Status</th>
                 <th id="tour-admin-actions" className="px-8 py-6 text-right">Opérations</th>
               </tr>
@@ -841,6 +842,19 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ documents, profile, storageUsag
                     <td className="px-8 py-8">
                       <div className="bg-slate-100 px-3 py-1.5 rounded-lg inline-block">
                         <span className="font-mono text-[10px] text-[#643012] font-black tracking-widest">{doc.accessCode}</span>
+                      </div>
+                    </td>
+                    <td className="px-8 py-8">
+                      <div className="flex flex-wrap gap-1 max-w-[250px]">
+                        {doc.partnerIds && doc.partnerIds.length > 0 ? (
+                          doc.partnerIds.map((email, i) => (
+                            <span key={i} className="text-[9px] bg-indigo-50 text-indigo-600 px-2 py-1 rounded-md font-black truncate max-w-full border border-indigo-100" title={email}>
+                              {email}
+                            </span>
+                          ))
+                        ) : (
+                          <span className="text-[9px] text-slate-300 font-bold uppercase tracking-widest">Aucun invité</span>
+                        )}
                       </div>
                     </td>
                     <td className="px-8 py-8 text-center">

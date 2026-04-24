@@ -6,9 +6,11 @@ import { decryptContent } from '../services/documentService';
 import { Sparkles, Camera, AlertTriangle } from 'lucide-react';
 import { useCameraLeakDetection } from '../hooks/useCameraLeakDetection';
 import DOMPurify from 'dompurify';
+import { UserProfile } from '../types';
 
 interface SecureViewerProps {
   document: SecureDocument;
+  readerProfile: UserProfile | null;
   onExit: () => void;
   isAdmin?: boolean;
   onDelete?: () => void;
@@ -24,7 +26,7 @@ const DECRYPTION_STEPS = [
   "Extraction du contenu sécurisé..."
 ];
 
-const SecureViewer: React.FC<SecureViewerProps> = ({ document: doc, onExit, isAdmin, onDelete }) => {
+const SecureViewer: React.FC<SecureViewerProps> = ({ document: doc, readerProfile, onExit, isAdmin, onDelete }) => {
   const [timeLeft, setTimeLeft] = useState(() => {
     const start = doc.lifespanStart || Date.now();
     const elapsed = Date.now() - start;
@@ -36,10 +38,10 @@ const SecureViewer: React.FC<SecureViewerProps> = ({ document: doc, onExit, isAd
   const [isReading, setIsReading] = useState(true);
 
   // Initialiser la détection de fuite (anti-téléphone)
-  const { cameraEnabled, leakDetected } = useCameraLeakDetection(doc.id, doc.uploaderId, "Partenaire");
+  const { cameraEnabled, cameraError, leakDetected } = useCameraLeakDetection(doc, readerProfile);
 
   // Le hook de sécurité pilote l'état de floutage
-  useSecurity(true, (triggered) => {
+  useSecurity(true, doc, readerProfile, (triggered) => {
     setIsBlurred(triggered);
   });
 
@@ -158,6 +160,18 @@ const SecureViewer: React.FC<SecureViewerProps> = ({ document: doc, onExit, isAd
           <div className="hidden lg:flex items-center gap-3 ml-4">
             <h1 className="text-sm font-black text-slate-900 uppercase truncate max-w-md">{doc.title}</h1>
           </div>
+          {isAdmin && doc.partnerIds && doc.partnerIds.length > 0 && (
+            <div className="hidden xl:flex items-center gap-2 ml-4 border-l border-slate-100 pl-4">
+              <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest mr-2">Partenaires :</span>
+              <div className="flex items-center gap-1.5 overflow-x-auto max-w-[400px] scrollbar-hide">
+                {doc.partnerIds.map((email, i) => (
+                  <span key={i} className="text-[8px] bg-indigo-50 text-indigo-600 border border-indigo-100 px-2 py-1 rounded-lg font-black whitespace-nowrap" title={email}>
+                    {email}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
         <div className="flex items-center gap-6">
            <div className="flex flex-col items-end">
@@ -170,16 +184,16 @@ const SecureViewer: React.FC<SecureViewerProps> = ({ document: doc, onExit, isAd
       </header>
 
       {/* Overlay de Sécurité Actif (now outside the scrollable parent) */}
-      {(isBlurred || leakDetected) && (
+      {(isBlurred || leakDetected || cameraError) && (
         <div className="fixed inset-0 z-[200] bg-white/60 backdrop-blur-[40px] flex flex-col items-center justify-center text-center p-8 animate-fade-in">
           <div className={`w-20 h-20 ${leakDetected ? 'bg-orange-600' : 'bg-red-600'} text-white rounded-[2rem] flex items-center justify-center mb-8 shadow-2xl animate-pulse`}>
-            {leakDetected ? <Camera className="w-8 h-8" /> : <i className="fas fa-eye-slash text-3xl"></i>}
+            {leakDetected ? <Camera className="w-8 h-8" /> : cameraError ? <AlertTriangle className="w-8 h-8" /> : <i className="fas fa-eye-slash text-3xl"></i>}
           </div>
           <h2 className="text-2xl md:text-4xl font-black text-slate-900 uppercase tracking-tighter">
-            {leakDetected ? "ALERTE DE TENTATIVE DE FUITE" : "Confidentialité Suspendue"}
+            {leakDetected ? "ALERTE DE TENTATIVE DE FUITE" : cameraError ? "Caméra Requise" : "Confidentialité Suspendue"}
           </h2>
           <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest mt-4 mb-4">
-            {leakDetected ? "Un téléphone ou une caméra a été détecté devant l'écran." : "Capture d'écran ou perte de focus détectée"}
+            {leakDetected ? "Un téléphone ou une caméra a été détecté devant l'écran." : cameraError ? "L'accès à la caméra est exigé pour déverrouiller ce document sécurisé." : "Capture d'écran ou perte de focus détectée"}
           </p>
           {leakDetected ? (
              <div className="flex flex-col items-center gap-6">
@@ -196,6 +210,13 @@ const SecureViewer: React.FC<SecureViewerProps> = ({ document: doc, onExit, isAd
                  Quitter la vue sécurisée
                </button>
              </div>
+          ) : cameraError ? (
+             <button 
+               onClick={onExit} 
+               className="px-12 py-5 bg-red-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl shadow-red-600/20 btn-active mb-10"
+             >
+               Sortir du mode sécurisé
+             </button>
           ) : (
              <button 
                onClick={() => setIsBlurred(false)} 

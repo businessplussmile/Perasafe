@@ -37,7 +37,7 @@ export function useAuth() {
             
             const newProfile: UserProfile = {
               uid: firebaseUser.uid,
-              email: firebaseUser.email || '',
+              email: (firebaseUser.email || '').toLowerCase(),
               role: isAdmin ? 'ADMIN' : 'COMPANY_OWNER',
               companyId: isAdmin ? undefined : companyId,
               subscriptionTier: 'FREE',

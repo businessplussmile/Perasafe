@@ -151,6 +151,29 @@ service cloud.firestore {
       allow delete: if (isValidId(companyId) && isCompanyOwner()) || isAdmin();
     }
 
+    // 5. Security Alerts Sub-collection
+    match /companies/{companyId}/securityAlerts/{alertId} {
+      function isCompanyOwner() {
+        return canAccess() && get(/databases/$(database)/documents/companies/$(companyId)).data.ownerId == request.auth.uid;
+      }
+
+      // Owners can read alerts for their company
+      allow read, list: if isCompanyOwner() || isAdmin();
+
+      function isValidAlert(data) {
+        return data.keys().hasAll(['type', 'documentId', 'companyId', 'ownerId', 'readerEmail', 'timestamp']) &&
+               data.type in ['SCREENSHOT_ATTEMPT', 'PHONE_DETECTED', 'BLUR_LOSS', 'CLIPBOARD_COPY'] &&
+               data.companyId == companyId &&
+               data.readerEmail == request.auth.token.email;
+               // data.timestamp == request.time; // Removed for now to avoid sync issues in dev
+      }
+
+      // Partners can create alerts when browsing documents
+      allow create: if canAccess() && isValidId(companyId) && isValidId(alertId) && isValidAlert(incoming());
+      
+      allow update, delete: if isAdmin();
+    }
+
     // 4. Secure List Queries for Partners (Collection Group)
     match /{path=**}/documents/{docId} {
       // Allows collectionGroup queries like: db.collectionGroup('documents').where('partnerIds', 'array-contains', userEmail)
