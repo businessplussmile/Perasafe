@@ -18,6 +18,7 @@ const SIGNATURE = "PERADOC-SIG-X14";
 const UserDocGrid: React.FC<UserDocGridProps> = ({ documents, onOpenDoc, isAdmin, onDeleteDoc, onImportDocuments, currentCompanyId, onNotifyEvent }) => {
   const [selectedDoc, setSelectedDoc] = useState<SecureDocument | null>(null);
   const [inputCode, setInputCode] = useState('');
+  const [legalConsented, setLegalConsented] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [error, setError] = useState('');
   const importFileInputRef = useRef<HTMLInputElement>(null);
@@ -78,6 +79,7 @@ const UserDocGrid: React.FC<UserDocGridProps> = ({ documents, onOpenDoc, isAdmin
       onOpenDoc(selectedDoc, inputCode);
       setSelectedDoc(null);
       setInputCode('');
+      setLegalConsented(false);
     } else {
       setError("Identification erronée.");
     }
@@ -258,31 +260,66 @@ const UserDocGrid: React.FC<UserDocGridProps> = ({ documents, onOpenDoc, isAdmin
 
       {selectedDoc && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-100/70 backdrop-blur-xl animate-fade-in">
-          <div className="bg-white w-full max-w-md rounded-[2.5rem] md:rounded-[3.5rem] p-8 md:p-16 shadow-2xl border border-slate-100 text-center">
-            <div className="w-16 h-16 md:w-24 md:h-24 bg-indigo-600 text-white rounded-2xl md:rounded-[2rem] flex items-center justify-center mx-auto mb-6 md:mb-10 shadow-xl">
-              <i className="fas fa-fingerprint text-2xl md:text-4xl"></i>
-            </div>
-            <h3 className="text-2xl md:text-3xl font-black text-slate-900 tracking-tighter mb-4 md:mb-6 uppercase">AUTHENTIFICATION</h3>
-            <p className="text-slate-400 text-[9px] md:text-[10px] font-bold uppercase tracking-[0.1em] mb-8 leading-relaxed">
-              EN ACCÉDANT À CE DOCUMENT, VOUS VOUS ENGAGEZ À NE JAMAIS DIVULGUER SON CONTENU.
-            </p>
-            <div className="space-y-6 md:space-y-8">
-              <input 
-                type="text"
-                autoFocus
-                value={inputCode}
-                onChange={(e) => { setInputCode(e.target.value); setError(''); }}
-                className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl md:rounded-[2rem] py-5 md:py-8 text-center text-3xl md:text-5xl tracking-[0.3em] md:tracking-[0.5em] font-mono focus:border-indigo-600 outline-none text-slate-900 uppercase transition-all"
-                placeholder="••••"
-                onKeyDown={(e) => e.key === 'Enter' && handleUnlock()}
-              />
-              {error && <p className="text-red-500 text-[9px] md:text-[10px] font-black uppercase tracking-widest">{error}</p>}
+          {!legalConsented ? (
+            <div className="bg-white w-full max-w-lg rounded-[2rem] p-8 md:p-12 shadow-2xl border-4 border-red-500 text-center relative overflow-hidden">
+              <div className="absolute top-0 left-0 right-0 py-2 bg-red-500 text-white font-black uppercase tracking-widest text-[10px]">
+                Avertissement Légal
+              </div>
+              <div className="w-16 h-16 bg-red-100 text-red-600 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-none mt-4">
+                <i className="fas fa-scale-balanced text-2xl md:text-3xl"></i>
+              </div>
+              <h3 className="text-xl md:text-2xl font-black text-slate-900 tracking-tighter mb-4 uppercase">RESPONSABILITÉ PÉNALE</h3>
+              
+              <div className="bg-red-50 p-6 rounded-2xl mb-8 border border-red-100 text-left">
+                <p className="text-red-900 text-xs font-bold leading-relaxed mb-4">
+                  En ouvrant ce document, vous êtes identifié et tracé.
+                </p>
+                <p className="text-red-800 text-xs font-medium leading-relaxed mb-4">
+                  Toute tentative de fraude, de capture d'écran, de photo par téléphone ou de copie de ce document déclenchera une <span className="font-black text-red-600">poursuite judiciaire immédiate par Perasafe</span>.
+                </p>
+                <div className="bg-white p-4 rounded-xl border border-red-200">
+                  <p className="text-slate-900 text-xs font-black uppercase text-center mb-1">Amende encourue :</p>
+                  <p className="text-red-600 text-lg font-black text-center tracking-tight">2.000.000 à 10.000.000 FCFA</p>
+                  <p className="text-slate-500 text-[9px] font-bold text-center mt-1 uppercase">Selon la gravité de la fuite</p>
+                </div>
+              </div>
+
               <div className="flex gap-3 md:gap-4">
-                <button onClick={() => { setSelectedDoc(null); setInputCode(''); }} className="flex-1 bg-slate-100 text-slate-600 font-black py-4 md:py-6 rounded-2xl text-[9px] md:text-[10px] uppercase tracking-widest">Abandon</button>
-                <button onClick={handleUnlock} className="flex-1 bg-indigo-600 text-white font-black py-4 md:py-6 rounded-2xl text-[9px] md:text-[10px] uppercase tracking-widest shadow-lg">Extraire</button>
+                <button onClick={() => { setSelectedDoc(null); setInputCode(''); setLegalConsented(false); }} className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-600 font-black py-4 rounded-xl text-[10px] uppercase tracking-widest transition-colors">
+                  Refuser & Quitter
+                </button>
+                <button onClick={() => setLegalConsented(true)} className="flex-1 bg-red-600 hover:bg-red-700 text-white font-black py-4 rounded-xl text-[10px] uppercase tracking-widest shadow-lg shadow-red-600/30 transition-all">
+                  J'accepte les risques
+                </button>
               </div>
             </div>
-          </div>
+          ) : (
+            <div className="bg-white w-full max-w-md rounded-[2.5rem] md:rounded-[3.5rem] p-8 md:p-16 shadow-2xl border border-slate-100 text-center">
+              <div className="w-16 h-16 md:w-24 md:h-24 bg-indigo-600 text-white rounded-2xl md:rounded-[2rem] flex items-center justify-center mx-auto mb-6 md:mb-10 shadow-xl">
+                <i className="fas fa-fingerprint text-2xl md:text-4xl"></i>
+              </div>
+              <h3 className="text-2xl md:text-3xl font-black text-slate-900 tracking-tighter mb-4 md:mb-6 uppercase">AUTHENTIFICATION</h3>
+              <p className="text-slate-400 text-[9px] md:text-[10px] font-bold uppercase tracking-[0.1em] mb-8 leading-relaxed">
+                EN ACCÉDANT À CE DOCUMENT, VOUS VOUS ENGAGEZ À NE JAMAIS DIVULGUER SON CONTENU.
+              </p>
+              <div className="space-y-6 md:space-y-8">
+                <input 
+                  type="text"
+                  autoFocus
+                  value={inputCode}
+                  onChange={(e) => { setInputCode(e.target.value); setError(''); }}
+                  className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl md:rounded-[2rem] py-5 md:py-8 text-center text-3xl md:text-5xl tracking-[0.3em] md:tracking-[0.5em] font-mono focus:border-indigo-600 outline-none text-slate-900 uppercase transition-all"
+                  placeholder="••••"
+                  onKeyDown={(e) => e.key === 'Enter' && handleUnlock()}
+                />
+                {error && <p className="text-red-500 text-[9px] md:text-[10px] font-black uppercase tracking-widest">{error}</p>}
+                <div className="flex gap-3 md:gap-4">
+                  <button onClick={() => { setSelectedDoc(null); setInputCode(''); setLegalConsented(false); }} className="flex-1 bg-slate-100 text-slate-600 font-black py-4 md:py-6 rounded-2xl text-[9px] md:text-[10px] uppercase tracking-widest">Abandon</button>
+                  <button onClick={handleUnlock} className="flex-1 bg-indigo-600 text-white font-black py-4 md:py-6 rounded-2xl text-[9px] md:text-[10px] uppercase tracking-widest shadow-lg">Extraire</button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
