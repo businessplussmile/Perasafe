@@ -55,6 +55,12 @@ export const useSecurity = (
       triggerPanic('BLUR_LOSS');
     };
 
+    const handleMouseLeave = (e: MouseEvent) => {
+      if (e.clientY <= 0 || e.clientX <= 0 || (e.clientX >= window.innerWidth || e.clientY >= window.innerHeight)) {
+        triggerPanic('BLUR_LOSS');
+      }
+    };
+
     const handleFocus = () => {
       releasePanic();
     };
@@ -71,30 +77,72 @@ export const useSecurity = (
       triggerPanic('CLIPBOARD_COPY');
     };
 
-    const handleSelectStart = (e: Event) => e.preventDefault();
+    const handleSelectStart = (e: Event) => {
+      e.preventDefault();
+      return false;
+    };
+
+    const handleTouchStart = (e: TouchEvent) => {
+      // If user uses more than 1 finger (usually 3 for screen grab), blur instantly
+      if (e.touches.length > 1) {
+        triggerPanic('SCREENSHOT_ATTEMPT');
+        addCssBlur();
+      }
+    };
+
+    // Fast pure dom css blur to block screenshot tools before React can re-render
+    const addCssBlur = () => {
+      const el = document.getElementById('secure-document-content');
+      if (el) {
+        el.style.filter = 'blur(60px)';
+        el.style.opacity = '0';
+      }
+    };
+    const removeCssBlur = () => {
+      const el = document.getElementById('secure-document-content');
+      if (el) {
+        el.style.filter = '';
+        el.style.opacity = '';
+      }
+    };
+
+    window.addEventListener('blur', addCssBlur);
+    window.document.addEventListener('mouseleave', addCssBlur);
+    window.addEventListener('focus', removeCssBlur);
+    window.document.addEventListener('mouseenter', removeCssBlur);
 
     window.addEventListener('contextmenu', handleContextMenu);
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('blur', handleBlur);
+    window.document.addEventListener('mouseleave', handleMouseLeave);
     window.addEventListener('focus', handleFocus);
     window.addEventListener('resize', handleResize);
     window.addEventListener('copy', handleCopy);
     window.addEventListener('cut', handleCopy);
     window.addEventListener('selectstart', handleSelectStart);
+    window.addEventListener('touchstart', handleTouchStart);
     window.document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('pagehide', handleBlur); // Mobile browsers often fire pagehide on screenshot
 
     const handleDrag = (e: DragEvent) => e.preventDefault();
     window.addEventListener('dragstart', handleDrag);
 
     return () => {
+      window.removeEventListener('blur', addCssBlur);
+      window.document.removeEventListener('mouseleave', addCssBlur);
+      window.removeEventListener('focus', removeCssBlur);
+      window.document.removeEventListener('mouseenter', removeCssBlur);
       window.removeEventListener('contextmenu', handleContextMenu);
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('blur', handleBlur);
+      window.document.removeEventListener('mouseleave', handleMouseLeave);
       window.removeEventListener('focus', handleFocus);
       window.removeEventListener('resize', handleResize);
       window.removeEventListener('copy', handleCopy);
       window.removeEventListener('cut', handleCopy);
       window.removeEventListener('selectstart', handleSelectStart);
+      window.removeEventListener('touchstart', handleTouchStart);
+      window.removeEventListener('pagehide', handleBlur);
       window.removeEventListener('dragstart', handleDrag);
       window.document.removeEventListener('visibilitychange', handleVisibilityChange);
     };

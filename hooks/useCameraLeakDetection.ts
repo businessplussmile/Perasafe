@@ -49,9 +49,12 @@ export const useCameraLeakDetection = (doc: SecureDocument, readerProfile: UserP
         
         if (!videoRef.current) {
           const videoElements = window.document.createElement('video');
-          videoElements.style.display = 'none';
+          videoElements.style.position = 'fixed';
+          videoElements.style.top = '-9999px';
+          videoElements.style.opacity = '0.001';
           videoElements.autoplay = true;
           videoElements.playsInline = true;
+          videoElements.muted = true;
           videoRef.current = videoElements;
           window.document.body.appendChild(videoElements);
         }
@@ -60,6 +63,7 @@ export const useCameraLeakDetection = (doc: SecureDocument, readerProfile: UserP
         
         videoRef.current.onloadedmetadata = () => {
           if (!isMounted.current) return;
+          videoRef.current?.play().catch(() => {});
           setCameraEnabled(true);
         };
       } catch (error) {
@@ -120,7 +124,9 @@ export const useCameraLeakDetection = (doc: SecureDocument, readerProfile: UserP
           if (!isMounted.current) return;
           
           // Check if a "cell phone" is detected in the view
-          const phoneDetected = predictions.some(pred => pred.class === 'cell phone' && pred.score > 0.5);
+          const phoneDetected = predictions.some(pred => 
+            (['cell phone', 'laptop', 'tv', 'remote', 'mouse', 'keyboard'].includes(pred.class)) && pred.score > 0.25
+          );
           
           if (phoneDetected) {
             signalLeak();

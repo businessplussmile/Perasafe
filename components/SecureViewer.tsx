@@ -230,17 +230,20 @@ const SecureViewer: React.FC<SecureViewerProps> = ({ document: doc, readerProfil
 
       <main className="flex-1 overflow-y-auto p-0 md:p-0 relative custom-scrollbar bg-slate-200/50 backdrop-blur-sm">
 
-        <div className={`w-full relative transition-all duration-500 ${isBlurred ? 'filter blur-[50px] scale-105 pointer-events-none' : leakDetected ? 'opacity-0 scale-95 pointer-events-none' : 'filter blur-0 scale-100 opacity-100'}`}>
+        <div id="secure-document-content" className={`w-full relative transition-all duration-500 ${isBlurred ? 'filter blur-[50px] opacity-0 scale-105 pointer-events-none' : leakDetected ? 'opacity-0 scale-95 pointer-events-none' : 'filter blur-0 scale-100 opacity-100'}`}>
           <div className="relative bg-white min-h-screen shadow-2xl p-0 flex flex-col relative overflow-hidden">
              
+             <div className="absolute inset-0 pointer-events-none select-none opacity-20 z-50 overflow-hidden mix-blend-multiply flex items-center justify-center">
+                <div className="w-[300%] h-[300%] flex flex-wrap gap-12 justify-center items-center -rotate-[30deg]">
+                   {Array.from({ length: 300 }).map((_, i) => (
+                      <span key={i} className="text-slate-500/30 font-black text-xl uppercase tracking-widest whitespace-nowrap">
+                         {readerProfile?.email} - DO NOT SHARE
+                      </span>
+                   ))}
+                </div>
+             </div>
+             
              <div className="h-4 md:h-6 bg-[#643012] w-full"></div>
-
-             <div className="absolute inset-0 pointer-events-none select-none opacity-[0.02] z-0" 
-                  style={{ 
-                    backgroundImage: `url("data:image/svg+xml,%3Csvg width='500' height='250' viewBox='0 0 500 250' xmlns='http://www.w3.org/2000/svg'%3E%3Ctext x='0' y='120' font-family='sans-serif' font-weight='900' font-size='14' fill='black' transform='rotate(-20 50 120)'%3EPERAFIND STRATEGIC INTELLIGENCE%3C/text%3E%3C/svg%3E")`,
-                    backgroundRepeat: 'repeat'
-                  }} 
-             />
              
              <div className="relative z-10 flex-1 px-8 md:px-24 lg:px-40">
                 <div className="pt-16 pb-12 flex flex-col items-center">
@@ -289,9 +292,18 @@ const SecureViewer: React.FC<SecureViewerProps> = ({ document: doc, readerProfil
         </div>
       </main>
       <style>{`
-        .rich-text-viewer img { max-width: 100%; height: auto; margin: 3rem 0; display: block; border-radius: 4px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+        .rich-text-viewer { 
+          -webkit-touch-callout: none !important; 
+          -webkit-user-select: none !important; 
+          user-select: none !important; 
+        }
+        .rich-text-viewer img { max-width: 100%; height: auto; margin: 3rem 0; display: block; border-radius: 4px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); pointer-events: none; }
         .rich-text-viewer font[size="7"] { font-size: 32px; line-height: 1.1; font-weight: 900; color: #1e293b; margin-bottom: 2rem; display: block; }
         @media (min-width: 768px) { .rich-text-viewer font[size="7"] { font-size: 64px; } }
+        @media print {
+          body { display: none !important; }
+          * { visibility: hidden !important; }
+        }
       `}</style>
     </div>
   );
