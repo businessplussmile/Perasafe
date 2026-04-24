@@ -69,7 +69,7 @@ service cloud.firestore {
                         !('isBlocked' in incoming()) && 
                         incoming().diff(existing()).affectedKeys().hasOnly(['name', 'companyId', 'subscriptionStatus', 'requestedTier', 'onboardingData', 'onboardingCompleted', 'subscriptionTier', 'subscriptionExpiresAt', 'role', 'hasSeenAdminTour', 'hasSeenUserTour']) &&
                         // Logic guards for self-updates
-                        (incoming().subscriptionStatus in ['NONE', 'PENDING'] || (incoming().role == 'PARTNER' && incoming().subscriptionStatus == 'ACTIVE') || isAdmin())
+                        (incoming().subscriptionStatus in ['NONE', 'PENDING'] || (incoming().role == 'PARTNER' && incoming().subscriptionStatus == 'ACTIVE') || (incoming().subscriptionStatus == 'ACTIVE' && incoming().subscriptionTier == 'FREE') || isAdmin())
                        ) || isAdmin()
                      );
       allow delete: if isAdmin();
