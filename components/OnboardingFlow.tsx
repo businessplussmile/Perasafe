@@ -57,23 +57,8 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ profile, onComplete, on
   }
 
   const handlePartnerAccess = async () => {
-    setIsSubmitting(true);
-    try {
-      const userRef = doc(db, 'users', profile.uid);
-      await updateDoc(userRef, {
-        onboardingCompleted: true,
-        // We keep them as COMPANY_OWNER so they can still create their own docs later
-        // without having to "re-create" an account.
-        subscriptionStatus: 'ACTIVE',
-        subscriptionTier: 'FREE' 
-      });
-      if (onComplete) onComplete();
-    } catch (error) {
-       console.error("Partner setup error:", error);
-       alert("Erreur de configuration du compte partenaire.");
-    } finally {
-       setIsSubmitting(false);
-    }
+    setSelectedTier('FREE');
+    handleNext();
   };
 
   const handleNext = () => {

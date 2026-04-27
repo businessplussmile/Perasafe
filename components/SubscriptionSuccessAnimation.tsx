@@ -1,8 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { db } from '../services/firebaseService';
 import { doc, updateDoc } from 'firebase/firestore';
 import { useAuth } from '../hooks/useAuth';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, PenTool, X } from 'lucide-react';
+import SignatureCanvas from 'react-signature-canvas';
 
 interface SubscriptionSuccessAnimationProps {
   companyName: string;
@@ -15,6 +16,9 @@ const SubscriptionSuccessAnimation: React.FC<SubscriptionSuccessAnimationProps> 
   const [showSurvey, setShowSurvey] = useState(false);
   const [surveyStep, setSurveyStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSigning, setIsSigning] = useState(false);
+  const [capturedSignature, setCapturedSignature] = useState<string>('[]');
+  const sigPad = useRef<any>(null);
   
   const [surveyData, setSurveyData] = useState({
     motivation: '',
@@ -41,7 +45,8 @@ const SubscriptionSuccessAnimation: React.FC<SubscriptionSuccessAnimationProps> 
     setIsSubmitting(true);
     try {
       await updateDoc(doc(db, 'users', profile.uid), {
-        onboardingSurvey: surveyData
+        onboardingSurvey: surveyData,
+        initialSignature: capturedSignature
       });
       // Fin et sortie
       setPhase(4); // Trigger fade out
@@ -196,9 +201,56 @@ const SubscriptionSuccessAnimation: React.FC<SubscriptionSuccessAnimationProps> 
             )}
 
             {surveyStep === 3 && (
+              <div className="animate-fade-in">
+                <button onClick={() => setSurveyStep(2)} className="mb-6 flex flex-row gap-2 items-center text-xs font-bold text-slate-400 hover:text-slate-600 transition-colors uppercase tracking-widest">
+                  <ArrowLeft className="w-4 h-4" /> Retour
+                </button>
+                <div className="text-center mb-8">
+                  <div className="w-16 h-16 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                    <PenTool className="w-8 h-8" />
+                  </div>
+                  <h3 className="text-xl font-black text-slate-900 uppercase tracking-tighter">Votre signature Maître</h3>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Elle sera utilisée pour certifier vos accès futurs</p>
+                </div>
+
+                <div className="relative mb-8">
+                  <div className="bg-slate-50 border-2 border-dashed border-slate-200 rounded-[2rem] overflow-hidden">
+                    <SignatureCanvas 
+                      ref={sigPad}
+                      penColor="#4f46e5"
+                      canvasProps={{
+                        className: "w-full h-48 cursor-crosshair",
+                      }}
+                      onBegin={() => setIsSigning(true)}
+                    />
+                  </div>
+                  {isSigning && (
+                    <button 
+                      onClick={() => { sigPad.current?.clear(); setIsSigning(false); }}
+                      className="absolute bottom-4 right-4 text-[9px] font-black text-slate-400 hover:text-red-500 uppercase tracking-widest transition-colors flex items-center gap-1"
+                    >
+                      <X className="w-3 h-3" /> Effacer
+                    </button>
+                  )}
+                </div>
+
+                <button 
+                  disabled={!isSigning}
+                  onClick={() => {
+                    setCapturedSignature(JSON.stringify(sigPad.current?.toData() || []));
+                    setSurveyStep(4);
+                  }}
+                  className="w-full bg-indigo-600 text-white font-black py-5 rounded-2xl text-[10px] uppercase tracking-widest shadow-xl shadow-indigo-600/20 hover:scale-[1.02] transition-all disabled:opacity-30 disabled:hover:scale-100"
+                >
+                  Confirmer ma signature
+                </button>
+              </div>
+            )}
+
+            {surveyStep === 4 && (
               <div className="animate-fade-in text-center py-6">
-                <button onClick={() => setSurveyStep(2)} className="mb-8 flex flex-row gap-2 items-center text-xs font-bold text-slate-400 hover:text-slate-600 transition-colors uppercase tracking-widest">
-                  <ArrowLeft className="w-4 h-4" /> Modifier mes réponses
+                <button onClick={() => setSurveyStep(3)} className="mb-8 flex flex-row gap-2 items-center text-xs font-bold text-slate-400 hover:text-slate-600 transition-colors uppercase tracking-widest">
+                  <ArrowLeft className="w-4 h-4" /> Modifier ma signature
                 </button>
                 <div className="w-20 h-20 bg-green-50 text-green-500 rounded-[2rem] flex items-center justify-center mx-auto mb-6 shadow-inner">
                   <svg className="w-10 h-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">

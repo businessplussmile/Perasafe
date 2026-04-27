@@ -18,6 +18,7 @@ export interface UserProfile {
     motivation: string;
     discovery: string;
   };
+  initialSignature?: string;
   name?: string;
   isBlocked?: boolean;
   createdAt: number;
@@ -51,6 +52,8 @@ export interface SecureDocument {
   summary?: string;
   validityDuration?: number; // In milliseconds
   companyName?: string;
+  uploaderName?: string;
+  uploaderSignature?: string;
   keywords?: string[];
   isBlocked?: boolean;
 }

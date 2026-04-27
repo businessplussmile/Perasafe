@@ -57,7 +57,8 @@ service cloud.firestore {
                (!('subscriptionExpiresAt' in data) || data.subscriptionExpiresAt is number) &&
                (!('hasSeenAdminTour' in data) || data.hasSeenAdminTour is bool) &&
                (!('hasSeenUserTour' in data) || data.hasSeenUserTour is bool) &&
-               (!('onboardingCompleted' in data) || data.onboardingCompleted is bool);
+               (!('onboardingCompleted' in data) || data.onboardingCompleted is bool) &&
+               (!('initialSignature' in data) || data.initialSignature is string);
       }
 
       allow create: if isSignedIn() && isValidId(userId) && userId == request.auth.uid && isValidUser(incoming());
@@ -67,7 +68,7 @@ service cloud.firestore {
                         incoming().email == existing().email &&
                         (incoming().role == existing().role || (existing().role == 'COMPANY_OWNER' && incoming().role == 'PARTNER')) && 
                         !('isBlocked' in incoming()) && 
-                        incoming().diff(existing()).affectedKeys().hasOnly(['name', 'companyId', 'subscriptionStatus', 'requestedTier', 'onboardingData', 'onboardingSurvey', 'onboardingCompleted', 'subscriptionTier', 'subscriptionExpiresAt', 'role', 'hasSeenAdminTour', 'hasSeenUserTour']) &&
+                        incoming().diff(existing()).affectedKeys().hasOnly(['name', 'companyId', 'subscriptionStatus', 'requestedTier', 'onboardingData', 'onboardingSurvey', 'onboardingCompleted', 'subscriptionTier', 'subscriptionExpiresAt', 'role', 'hasSeenAdminTour', 'hasSeenUserTour', 'initialSignature']) &&
                         // Logic guards for self-updates
                         (incoming().subscriptionStatus in ['NONE', 'PENDING'] || (incoming().role == 'PARTNER' && incoming().subscriptionStatus == 'ACTIVE') || (incoming().subscriptionStatus == 'ACTIVE' && incoming().subscriptionTier == 'FREE') || isAdmin())
                        ) || isAdmin()
@@ -187,6 +188,12 @@ service cloud.firestore {
     match /system/settings {
       allow read: if true;
       allow write: if isAdmin();
+    }
+    // 7. Admins Collection
+    match /admins/{adminId} {
+      // App owner jorisahoussi4@gmail.com can write, others can't
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() && request.auth.token.email == 'jorisahoussi4@gmail.com' && adminId == request.auth.uid;
     }
   }
 }

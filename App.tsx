@@ -380,6 +380,8 @@ const App: React.FC = () => {
       isConsumed: false,
       companyId: profile.companyId,
       uploaderId: profile.uid,
+      uploaderName: profile.name || 'Le Propriétaire',
+      uploaderSignature: profile.initialSignature || '',
       companyName: companyName,
       partnerIds: docData.partnerIds || [],
       summary: docData.summary || '',
