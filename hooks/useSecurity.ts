@@ -7,14 +7,22 @@ export const useSecurity = (
   enabled: boolean, 
   doc: SecureDocument | null,
   readerProfile: UserProfile | null,
-  onSecurityTrigger?: (active: boolean) => void
+  onSecurityTrigger?: (active: boolean) => void,
+  onFatal?: () => void
 ) => {
   useEffect(() => {
     if (!enabled || !doc || !readerProfile) return;
 
-    const triggerPanic = (type: AlertType) => {
+    const triggerPanic = (type: AlertType, fatal: boolean = false) => {
       if (onSecurityTrigger) onSecurityTrigger(true);
       logSecurityAlert(type, doc, readerProfile);
+      
+      // Force instant CSS blur for zero-latency protection
+      addCssBlur();
+
+      if (fatal && onFatal) {
+        onFatal();
+      }
     };
 
     const releasePanic = () => {
@@ -39,7 +47,7 @@ export const useSecurity = (
 
       if (forbiddenKeys.includes(e.key) || forbiddenCombos.some(combo => combo)) {
         e.preventDefault();
-        triggerPanic('SCREENSHOT_ATTEMPT');
+        triggerPanic('SCREENSHOT_ATTEMPT', true);
         return false;
       }
     };
@@ -65,11 +73,25 @@ export const useSecurity = (
       releasePanic();
     };
 
+    let lastWidth = window.innerWidth;
+    let lastHeight = window.innerHeight;
     const threshold = 160;
+
     const handleResize = () => {
-      if (window.outerWidth - window.innerWidth > threshold || window.outerHeight - window.innerHeight > threshold) {
-        triggerPanic('BLUR_LOSS');
+      const widthDiff = Math.abs(window.innerWidth - lastWidth);
+      const heightDiff = Math.abs(window.innerHeight - lastHeight);
+      
+      // Detection of sudden DevTools panel snapping
+      if (widthDiff > 120 || heightDiff > 120) {
+        triggerPanic('BLUR_LOSS', true); // Kill on brutal resize
       }
+
+      if (window.outerWidth - window.innerWidth > threshold || window.outerHeight - window.innerHeight > threshold) {
+        triggerPanic('BLUR_LOSS', true);
+      }
+
+      lastWidth = window.innerWidth;
+      lastHeight = window.innerHeight;
     };
 
     const handleCopy = (e: ClipboardEvent) => {

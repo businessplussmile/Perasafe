@@ -763,7 +763,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ documents, profile, storageUsag
 
                  <div className="absolute inset-0 pointer-events-none select-none opacity-[0.02] z-0" 
                       style={{ 
-                        backgroundImage: `url("data:image/svg+xml,%3Csvg width='500' height='250' viewBox='0 0 500 250' xmlns='http://www.w3.org/2000/svg'%3E%3Ctext x='0' y='120' font-family='sans-serif' font-weight='900' font-size='14' fill='black' transform='rotate(-20 50 120)'%3E${encodeURIComponent(profile?.companyName ? `PROPRIÉTÉ DE ${profile.companyName.toUpperCase()}` : "DOCUMENT SÉCURISÉ")}%3C/text%3E%3C/svg%3E")`,
+                        backgroundImage: `url("data:image/svg+xml,%3Csvg width='500' height='250' viewBox='0 0 500 250' xmlns='http://www.w3.org/2000/svg'%3E%3Ctext x='0' y='120' font-family='sans-serif' font-weight='900' font-size='14' fill='black' transform='rotate(-20 50 120)'%3E${encodeURIComponent(profile?.onboardingData?.companyName ? `PROPRIÉTÉ DE ${profile.onboardingData.companyName.toUpperCase()}` : "DOCUMENT SÉCURISÉ")}%3C/text%3E%3C/svg%3E")`,
                         backgroundRepeat: 'repeat'
                       }} 
                  />
@@ -776,7 +776,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ documents, profile, storageUsag
 
                     <div className="max-w-4xl text-center">
                        <p className="text-[#8fa1b4] text-[9px] md:text-[11px] font-bold uppercase tracking-[0.15em] leading-[1.8] opacity-80">
-                          CE DOCUMENT EST LA PROPRIÉTÉ EXCLUSIVE DE {profile?.companyName ? profile.companyName.toUpperCase() : "VOTRE ENTREPRISE"}. TOUTE REPRODUCTION OU DIVULGATION CONSTITUE UNE FAUTE GRAVE.
+                          CE DOCUMENT EST LA PROPRIÉTÉ EXCLUSIVE DE {profile?.onboardingData?.companyName ? profile.onboardingData.companyName.toUpperCase() : "VOTRE ENTREPRISE"}. TOUTE REPRODUCTION OU DIVULGATION CONSTITUE UNE FAUTE GRAVE.
                        </p>
                     </div>
 

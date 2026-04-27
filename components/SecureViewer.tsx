@@ -28,7 +28,7 @@ const DECRYPTION_STEPS = [
 
 const SecureViewer: React.FC<SecureViewerProps> = ({ document: doc, readerProfile, onExit, isAdmin, onDelete }) => {
   const [timeLeft, setTimeLeft] = useState(() => {
-    const isOwnerInit = readerProfile?.uid === doc.uploaderId || (readerProfile?.role === 'COMPANY_OWNER' && readerProfile?.companyId === doc.companyId) || readerProfile?.role === 'SUPER_ADMIN';
+    const isOwnerInit = readerProfile?.uid === doc.uploaderId || (readerProfile?.role === 'COMPANY_OWNER' && readerProfile?.companyId === doc.companyId) || readerProfile?.role === 'ADMIN';
     if (isOwnerInit) return Infinity;
     const start = doc.lifespanStart || Date.now();
     const elapsed = Date.now() - start;
@@ -38,6 +38,7 @@ const SecureViewer: React.FC<SecureViewerProps> = ({ document: doc, readerProfil
   const [isBlurred, setIsBlurred] = useState(false);
   const [loadingProgress, setLoadingProgress] = useState(0);
   const [isReading, setIsReading] = useState(true);
+  const [isFatal, setIsFatal] = useState(false);
 
   // Initialiser la détection de fuite (anti-téléphone)
   const { cameraEnabled, cameraError, leakDetected } = useCameraLeakDetection(doc, readerProfile);
@@ -45,6 +46,9 @@ const SecureViewer: React.FC<SecureViewerProps> = ({ document: doc, readerProfil
   // Le hook de sécurité pilote l'état de floutage
   useSecurity(true, doc, readerProfile, (triggered) => {
     setIsBlurred(triggered);
+  }, () => {
+    setIsFatal(true);
+    setTimeout(onExit, 3000); // Kick after 3s message
   });
 
   const decryptedBody = useMemo(() => {
@@ -70,7 +74,7 @@ const SecureViewer: React.FC<SecureViewerProps> = ({ document: doc, readerProfil
       }
     }, 80); // Shorter interval
 
-    const isOwner = readerProfile?.uid === doc.uploaderId || (readerProfile?.role === 'COMPANY_OWNER' && readerProfile?.companyId === doc.companyId) || readerProfile?.role === 'SUPER_ADMIN';
+    const isOwner = readerProfile?.uid === doc.uploaderId || (readerProfile?.role === 'COMPANY_OWNER' && readerProfile?.companyId === doc.companyId) || readerProfile?.role === 'ADMIN';
 
     const timer = setInterval(() => {
       if (isOwner) {
@@ -199,18 +203,22 @@ const SecureViewer: React.FC<SecureViewerProps> = ({ document: doc, readerProfil
       </header>
 
       {/* Overlay de Sécurité Actif (now outside the scrollable parent) */}
-      {(isBlurred || leakDetected || cameraError) && (
+      {(isBlurred || leakDetected || cameraError || isFatal) && (
         <div className="fixed inset-0 z-[200] bg-white/60 backdrop-blur-[40px] flex flex-col items-center justify-center text-center p-8 animate-fade-in">
-          <div className={`w-20 h-20 ${leakDetected ? 'bg-orange-600' : 'bg-red-600'} text-white rounded-[2rem] flex items-center justify-center mb-8 shadow-2xl animate-pulse`}>
-            {leakDetected ? <Camera className="w-8 h-8" /> : cameraError ? <AlertTriangle className="w-8 h-8" /> : <i className="fas fa-eye-slash text-3xl"></i>}
+          <div className={`w-20 h-20 ${isFatal ? 'bg-black animate-scale-in' : leakDetected ? 'bg-orange-600' : 'bg-red-600'} text-white rounded-[2rem] flex items-center justify-center mb-8 shadow-2xl animate-pulse`}>
+            {isFatal ? <AlertTriangle className="w-10 h-10 text-red-500" /> : leakDetected ? <Camera className="w-8 h-8" /> : cameraError ? <AlertTriangle className="w-8 h-8" /> : <i className="fas fa-eye-slash text-3xl"></i>}
           </div>
           <h2 className="text-2xl md:text-4xl font-black text-slate-900 uppercase tracking-tighter">
-            {leakDetected ? "ALERTE DE TENTATIVE DE FUITE" : cameraError ? "Caméra Requise" : "Confidentialité Suspendue"}
+            {isFatal ? "SÉCURITÉ COMPROMISE" : leakDetected ? "ALERTE DE TENTATIVE DE FUITE" : cameraError ? "Caméra Requise" : "Confidentialité Suspendue"}
           </h2>
           <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest mt-4 mb-4">
-            {leakDetected ? "Un téléphone ou une caméra a été détecté devant l'écran." : cameraError ? "L'accès à la caméra est exigé pour déverrouiller ce document sécurisé." : "Capture d'écran ou perte de focus détectée"}
+            {isFatal ? "Comportement suspect détecté. La session est immédiatement révoquée." : leakDetected ? "Un téléphone ou une caméra a été détecté devant l'écran." : cameraError ? "L'accès à la caméra est exigé pour déverrouiller ce document sécurisé." : "Capture d'écran ou perte de focus détectée"}
           </p>
-          {leakDetected ? (
+          {isFatal ? (
+             <div className="bg-red-600 text-white p-6 rounded-2xl max-w-sm font-black uppercase tracking-widest text-[10px]">
+               ACCÈS RÉVOQUÉ - PROTOCOLE DE PROTECTION ACTIF
+             </div>
+          ) : leakDetected ? (
              <div className="flex flex-col items-center gap-6">
                <div className="bg-orange-100/50 border border-orange-200 text-orange-800 p-4 rounded-xl text-xs max-w-sm font-semibold mb-2 flex items-start gap-4 text-left">
                   <AlertTriangle className="w-5 h-5 shrink-0 mt-0.5 text-orange-600" />
