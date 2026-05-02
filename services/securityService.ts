@@ -3,7 +3,7 @@ import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from './firebaseService';
 import { UserProfile, SecureDocument } from '../types';
 
-export type AlertType = 'SCREENSHOT_ATTEMPT' | 'PHONE_DETECTED' | 'BLUR_LOSS' | 'CLIPBOARD_COPY';
+export type AlertType = 'SCREENSHOT_ATTEMPT' | 'PHONE_DETECTED' | 'BLUR_LOSS' | 'CLIPBOARD_COPY' | 'AUDIO_SCREENSHOT_DETECTED';
 
 export const logSecurityAlert = async (
   type: AlertType,

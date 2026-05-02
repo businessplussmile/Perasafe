@@ -2,6 +2,7 @@
   "name": "PERASafe Enterprise Cloud",
   "description": "Secure document sharing platform. Features cloud authentication, end-to-end security, granular access control, and camera-based anti-leak protection.",
   "requestFramePermissions": [
-    "camera"
+    "camera",
+    "microphone"
   ]
 }

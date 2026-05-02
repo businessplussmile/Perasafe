@@ -11,7 +11,7 @@ export const useSecurity = (
   onFatal?: () => void
 ) => {
   useEffect(() => {
-    if (!enabled || !doc || !readerProfile) return;
+    if (!enabled || !doc || !readerProfile || readerProfile.uid === doc.uploaderId) return;
 
     const triggerPanic = (type: AlertType, fatal: boolean = false) => {
       if (onSecurityTrigger) onSecurityTrigger(true);
@@ -112,6 +112,18 @@ export const useSecurity = (
       }
     };
 
+    // DevTools Detection Loop (anti-inspection)
+    const securityInterval = setInterval(() => {
+      const before = performance.now();
+      // eslint-disable-next-line no-debugger
+      debugger;
+      const after = performance.now();
+      if (after - before > 100) {
+        // DevTools is open and paused execution
+        triggerPanic('BLUR_LOSS', true);
+      }
+    }, 1500);
+
     // Fast pure dom css blur to block screenshot tools before React can re-render
     const addCssBlur = () => {
       const el = document.getElementById('secure-document-content');
@@ -167,6 +179,7 @@ export const useSecurity = (
       window.removeEventListener('pagehide', handleBlur);
       window.removeEventListener('dragstart', handleDrag);
       window.document.removeEventListener('visibilitychange', handleVisibilityChange);
+      clearInterval(securityInterval);
     };
   }, [enabled, doc, readerProfile, onSecurityTrigger]);
 };

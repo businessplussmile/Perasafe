@@ -49,8 +49,11 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ profile, alerts = [
         title = "Tentative de copie (Presse-papier)";
         message = `L'utilisateur ${alert.readerEmail} a tenté de copier le contenu de "${alert.documentTitle}".`;
       } else if (alert.type === 'BLUR_LOSS') {
-        title = "Perte de focus (Risque de capture)";
+        title = "Perte de focus (Enregistreur externe suspecté)";
         message = `La fenêtre sécurisée a perdu le focus pour ${alert.readerEmail} (possible enregistreur externe).`;
+      } else if (alert.type === 'AUDIO_SCREENSHOT_DETECTED') {
+        title = "Bruit de capture d'écran détecté";
+        message = `Un son similaire à une capture d'écran a été détecté pour ${alert.readerEmail} sur "${alert.documentTitle}".`;
       }
 
       list.push({

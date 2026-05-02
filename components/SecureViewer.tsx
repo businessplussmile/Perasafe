@@ -209,10 +209,10 @@ const SecureViewer: React.FC<SecureViewerProps> = ({ document: doc, readerProfil
             {isFatal ? <AlertTriangle className="w-10 h-10 text-red-500" /> : leakDetected ? <Camera className="w-8 h-8" /> : cameraError ? <AlertTriangle className="w-8 h-8" /> : <i className="fas fa-eye-slash text-3xl"></i>}
           </div>
           <h2 className="text-2xl md:text-4xl font-black text-slate-900 uppercase tracking-tighter">
-            {isFatal ? "SÉCURITÉ COMPROMISE" : leakDetected ? "ALERTE DE TENTATIVE DE FUITE" : cameraError ? "Caméra Requise" : "Confidentialité Suspendue"}
+            {isFatal ? "SÉCURITÉ COMPROMISE" : leakDetected ? "ALERTE DE TENTATIVE DE FUITE" : cameraError ? "Autorisations Requises" : "Confidentialité Suspendue"}
           </h2>
           <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest mt-4 mb-4">
-            {isFatal ? "Comportement suspect détecté. La session est immédiatement révoquée." : leakDetected ? "Un téléphone ou une caméra a été détecté devant l'écran." : cameraError ? "L'accès à la caméra est exigé pour déverrouiller ce document sécurisé." : "Capture d'écran ou perte de focus détectée"}
+            {isFatal ? "Comportement suspect détecté. La session est immédiatement révoquée." : leakDetected ? (leakDetected === 'AUDIO_SCREENSHOT_DETECTED' ? "Un bruit de capture d'écran a été détecté." : "Un téléphone ou une caméra a été détecté devant l'écran.") : cameraError ? "L'accès à la caméra et au micro est exigé pour déverrouiller ce document sécurisé." : "Capture d'écran ou perte de focus détectée"}
           </p>
           {isFatal ? (
              <div className="bg-red-600 text-white p-6 rounded-2xl max-w-sm font-black uppercase tracking-widest text-[10px]">
@@ -256,11 +256,21 @@ const SecureViewer: React.FC<SecureViewerProps> = ({ document: doc, readerProfil
         <div id="secure-document-content" className={`w-full relative transition-all duration-500 ${isBlurred ? 'filter blur-[50px] opacity-0 scale-105 pointer-events-none' : leakDetected ? 'opacity-0 scale-95 pointer-events-none' : 'filter blur-0 scale-100 opacity-100'}`}>
           <div className="relative bg-white min-h-screen shadow-2xl p-0 flex flex-col relative overflow-hidden">
              
-             <div className="absolute inset-0 pointer-events-none select-none opacity-[0.05] z-50 overflow-hidden mix-blend-multiply flex items-center justify-center">
-                <div className="w-[300%] h-[300%] flex flex-wrap gap-24 justify-center items-center -rotate-[30deg]">
-                   {Array.from({ length: 150 }).map((_, i) => (
-                      <span key={i} className="text-slate-500 font-black text-xl md:text-2xl uppercase tracking-widest whitespace-nowrap">
-                         {readerProfile?.email} - PROPRIÉTÉ DE {doc.companyName ? doc.companyName.toUpperCase() : "L'ENTREPRISE"}
+             <div className="absolute inset-0 pointer-events-none select-none opacity-[0.06] z-50 overflow-hidden mix-blend-multiply flex items-center justify-center">
+                <style>{`
+                  @keyframes watermarkMove {
+                    0% { transform: translate(0, 0) rotate(-30deg); }
+                    50% { transform: translate(-2%, -2%) rotate(-30deg); }
+                    100% { transform: translate(0, 0) rotate(-30deg); }
+                  }
+                  .animated-watermark {
+                    animation: watermarkMove 20s infinite ease-in-out;
+                  }
+                `}</style>
+                <div className="w-[300%] h-[300%] flex flex-wrap gap-12 justify-center items-center animated-watermark">
+                   {Array.from({ length: 400 }).map((_, i) => (
+                      <span key={i} className="text-slate-900 font-black text-sm md:text-md uppercase tracking-widest whitespace-nowrap">
+                         {readerProfile?.email} - IP/MAC TRACED - {new Date().toISOString()} - PROPRIÉTÉ DE {doc.companyName ? doc.companyName.toUpperCase() : "L'ENTREPRISE"}
                       </span>
                    ))}
                 </div>

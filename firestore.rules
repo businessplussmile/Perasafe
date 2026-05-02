@@ -156,6 +156,9 @@ service cloud.firestore {
     }
 
     // 5. Security Alerts Sub-collection
+    match /{path=**}/securityAlerts/{alertId} {
+       allow list: if isAdmin();
+    }
     match /companies/{companyId}/securityAlerts/{alertId} {
       function isCompanyOwner() {
         return canAccess() && get(/databases/$(database)/documents/companies/$(companyId)).data.ownerId == request.auth.uid;
@@ -166,7 +169,7 @@ service cloud.firestore {
 
       function isValidAlert(data) {
         return data.keys().hasAll(['type', 'documentId', 'companyId', 'ownerId', 'readerEmail', 'timestamp']) &&
-               data.type in ['SCREENSHOT_ATTEMPT', 'PHONE_DETECTED', 'BLUR_LOSS', 'CLIPBOARD_COPY'] &&
+               data.type in ['SCREENSHOT_ATTEMPT', 'PHONE_DETECTED', 'BLUR_LOSS', 'CLIPBOARD_COPY', 'AUDIO_SCREENSHOT_DETECTED'] &&
                data.companyId == companyId &&
                data.readerEmail == request.auth.token.email;
                // data.timestamp == request.time; // Removed for now to avoid sync issues in dev
